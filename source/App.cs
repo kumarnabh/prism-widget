@@ -21,13 +21,14 @@ public class App : Application
 {
     [STAThread] public static void Main(string[] args)
     {
-        bool diagnostic=args.Contains("--preview")||args.Contains("--selftest"),created=true;
+        bool offline=args.Contains("--offline-selftest");
+        bool diagnostic=args.Contains("--preview")||args.Contains("--selftest")||offline,created=true;
         string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
         using var instance=diagnostic?null:new System.Threading.Mutex(true,"Local\\PrismWidget_"+identity,out created);
         if(!created){ActivateExisting();return;}
         var app = new App();
         app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true; };
-        app.Run(new Widget(args.Contains("--preview"), args.Contains("--selftest")));
+        app.Run(new Widget(args.Contains("--preview"), args.Contains("--selftest")||offline,offline));
     }
     static void ActivateExisting()
     {
@@ -86,14 +87,14 @@ public sealed class Widget : Window
     Process? collector;
     readonly System.Threading.CancellationTokenSource lifetime=new();
     readonly List<Button> refreshButtons=new();
-    readonly bool preview,selftest;
+    readonly bool preview,selftest,offline;
     StackPanel systems=null!;
     Button pin=null!;
     Button metricPin=null!;
     JsonElement providers;
-    public Widget(bool preview,bool selftest)
+    public Widget(bool preview,bool selftest,bool offline=false)
     {
-        this.preview=preview; this.selftest=selftest;
+        this.preview=preview; this.selftest=selftest;this.offline=offline;
         Directory.CreateDirectory(Data);
         Title="Prism · workspace pulse"; Width=442; Height=858; WindowStyle=WindowStyle.None;
         Icon=BitmapFrame.Create(new Uri("pack://application:,,,/Assets/prism.ico"));
@@ -115,7 +116,7 @@ public sealed class Widget : Window
         Left=SystemParameters.WorkArea.Right-Width-24; Top=SystemParameters.WorkArea.Top+24;
         MaxHeight=SystemParameters.WorkArea.Height-24;
         Build();
-        LoadPosition();
+        if(!offline)LoadPosition();
         reminderPopup.PlacementTarget=frame;reminderTimer.Tick+=(_,_)=>DismissReminder();
         SizeChanged+=(_,_)=>AdaptLayout();
         systemTimer.Tick+=(_,_)=>UpdateSystem(); providerTimer.Tick+=async (_,_)=>await UpdateProviders();
@@ -180,6 +181,7 @@ public sealed class Widget : Window
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
             menu.Items.Add(new Separator());Item("Free RAM…","",ShowMemory);Item("Connections…","Ctrl+,",()=>ShowConnection("cursor","Cursor"));
             Item("World clocks…","",ShowClocks);Item("Reset reminders…","",ShowResetReminders);
+            Item("Diagnostics…","",async()=>await ShowDiagnostics());
             menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
             menu.PlacementTarget=button;menu.Placement=PlacementMode.Bottom;menu.IsOpen=true;
         };return button;
@@ -370,9 +372,14 @@ public sealed class Widget : Window
     void StopCollector(){try{if(collector is {HasExited:false})collector.Kill(true);}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}}
     async System.Threading.Tasks.Task UpdateProviders()
     {
+        if(offline){
+            using var fixture=JsonDocument.Parse("{\"codex\":{\"status\":\"Connect\"},\"cursor\":{\"status\":\"Connect\"},\"opencode\":{\"status\":\"Connect\"},\"claude\":{\"status\":\"Connect\"}}");
+            providers=fixture.RootElement.Clone();foreach(var (key,card) in cards)card.Update(providers.GetProperty(key));
+            footer.Text="Offline verification · no account access";AdaptLayout();return;
+        }
         if(busy||closed)return;busy=true;foreach(var button in refreshButtons)button.IsEnabled=false;footer.Text="●  Refreshing AI readings";
         try {
-            var start=new ProcessStartInfo{FileName="python",WorkingDirectory=Root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+            var start=new ProcessStartInfo{FileName=RuntimeSupport.Python(Root),WorkingDirectory=Root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
             start.ArgumentList.Add(System.IO.Path.Combine(Root,"providers.py"));
             collector=Process.Start(start)!; var stdout=collector.StandardOutput.ReadToEndAsync();var stderr=collector.StandardError.ReadToEndAsync();
             using var cts=System.Threading.CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);cts.CancelAfter(TimeSpan.FromSeconds(45));await collector.WaitForExitAsync(cts.Token);
@@ -416,7 +423,7 @@ public sealed class Widget : Window
     void ShowResetReminders()
     {
         var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
-        var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=stack;stack.Children.Add(Text("A nudge before the reset",23));
+        var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("A nudge before the reset",23));
         var info=Text("Show a quiet, 12-second reminder when a quota window is about to reset and more than 10% remains. Each window alerts once per reset, even across restarts.",12,Muted);info.Margin=new Thickness(0,12,0,18);stack.Children.Add(info);
         var enabled=new CheckBox{Content="Enable reset reminders",IsChecked=resetReminders.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,12)};stack.Children.Add(enabled);
         stack.Children.Add(Text("Remind me before reset",11,Muted));
@@ -468,6 +475,27 @@ public sealed class Widget : Window
             try{next.Save(System.IO.Path.Combine(Data,"clocks.json"));clockPreferences=next;AdaptLayout();dialog.Close();}
             catch(Exception e) when(e is IOException or UnauthorizedAccessException){note.Text="Could not save the clock preferences. Check folder access.";}
         });stack.Children.Add(save);dialog.ShowDialog();
+    }
+    async System.Threading.Tasks.Task ShowDiagnostics()
+    {
+        string report="Prism "+typeof(Widget).Assembly.GetName().Version+"\n.NET "+Environment.Version+"\n";
+        try{
+            var start=new ProcessStartInfo{FileName=RuntimeSupport.Python(Root),WorkingDirectory=Root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
+            start.ArgumentList.Add(System.IO.Path.Combine(Root,"doctor.py"));
+            using var process=Process.Start(start)!;
+            var stdout=process.StandardOutput.ReadToEndAsync();var stderr=process.StandardError.ReadToEndAsync();
+            using var timeout=System.Threading.CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);timeout.CancelAfter(TimeSpan.FromSeconds(10));
+            try{await process.WaitForExitAsync(timeout.Token);}catch{try{process.Kill(true);}catch{}throw;}
+            if(process.ExitCode!=0)throw new IOException();
+            report+=await stdout;await stderr;
+        }catch{report+="Python diagnostics unavailable. Run Setup.cmd and try again.";}
+        if(closed)return;
+        var dialog=new Window{Title="Prism · Diagnostics",Owner=this,Width=490,Height=500,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+        stack.Children.Add(Text("Connection diagnostics",23));
+        var info=Text("Dependency availability only. This report contains no account IDs, quota values, credentials, folder paths or machine name. CLI detection here checks PATH; provider adapters also check supported installation locations.",12,Muted);info.Margin=new Thickness(0,12,0,12);stack.Children.Add(info);
+        var content=new TextBox{Text=report,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Background=Brush("#1C2D43"),Foreground=new SolidColorBrush(Ink),Padding=new Thickness(12),BorderThickness=new Thickness(0)};stack.Children.Add(content);
+        var copy=Button("Copy report","Copy dependency diagnostics to clipboard",()=>{try{Clipboard.SetText(report);}catch{MessageBox.Show("Clipboard is busy. Select the report and copy it manually.","Prism");}});copy.Margin=new Thickness(0,12,0,0);stack.Children.Add(copy);dialog.ShowDialog();
     }
     void ShowConnection(string key,string name)
     {
@@ -548,7 +576,7 @@ public sealed class Widget : Window
             if(settings.ContainsKey("statusLine")){MessageBox.Show(owner,"You already have a Claude status line. Prism has preserved it. See README.html for the feed command to integrate with your existing script.","Existing status line preserved");return;}
             if(MessageBox.Show(owner,"Add the Prism status-line command to your Claude Code settings? A backup will be saved; other settings are preserved.","Connect Claude",MessageBoxButton.OKCancel)!=MessageBoxResult.OK)return;
             if(File.Exists(config))File.Copy(config,config+".prism-backup-"+DateTime.Now.ToString("yyyyMMddHHmmss"));
-            settings["statusLine"]=new System.Text.Json.Nodes.JsonObject{["type"]="command",["command"]="python \""+System.IO.Path.Combine(Root,"claude_feed.py").Replace('\\','/')+"\""};
+            settings["statusLine"]=new System.Text.Json.Nodes.JsonObject{["type"]="command",["command"]="\""+RuntimeSupport.Python(Root).Replace('\\','/')+"\" \""+System.IO.Path.Combine(Root,"claude_feed.py").Replace('\\','/')+"\""};
             Directory.CreateDirectory(System.IO.Path.GetDirectoryName(config)!);File.WriteAllText(config,settings.ToJsonString(new JsonSerializerOptions{WriteIndented=true}));
             MessageBox.Show(owner,"Connected. Restart Claude Code, then complete a turn to populate the widget.","Claude connected");
         } catch(Exception e){MessageBox.Show(owner,e.Message,"Connection could not be saved");}
@@ -564,7 +592,7 @@ public sealed class Widget : Window
     void RunSelfTest()
     {
         bool initial=Topmost;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));bool pinOk=Topmost!=initial;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-        bool initialCompact=compact;double initialHeight=Height;compact=false;Height=Math.Min(MaxHeight,800);AdaptLayout();ToggleCompact();UpdateLayout();AdaptLayout();bool compactOk=metricsOnly;ToggleCompact();UpdateLayout();AdaptLayout();compactOk&=!metricsOnly;compact=initialCompact;Height=initialHeight;AdaptLayout();
+        bool initialCompact=compact;double initialHeight=Height;compact=false;Height=Math.Min(MaxHeight,800);AdaptLayout();ToggleCompact();UpdateLayout();AdaptLayout();bool compactOk=metricsOnly;ToggleCompact();UpdateLayout();AdaptLayout();compactOk&=metricsOnly==(ActualHeight<640);compact=initialCompact;Height=initialHeight;AdaptLayout();
         bool quotaValidation=RunQuotaChecks();
         bool clocks=WorldClocks.Verify();
         var clockTestPath=System.IO.Path.Combine(Root,"build","test-tmp","clocks-"+Guid.NewGuid().ToString("N")+".json");
@@ -590,9 +618,9 @@ public sealed class Widget : Window
         foreach(var preset in new[]{(442d,800d),(560d,220d),(1200d,120d)}){
             ApplyPreset(preset.Item1,preset.Item2);UpdateLayout();AdaptLayout();UpdateLayout();
             presets&=Math.Abs(ActualWidth-Math.Min(preset.Item1,MaxWidth))<1&&Math.Abs(ActualHeight-Math.Clamp(preset.Item2,MinHeight,MaxHeight))<1;
-            presets&=metricsOnly==(preset.Item2<640);
+            presets&=metricsOnly==(ActualHeight<640);
         }
-        var layouts=new List<object>();bool fits=true;var oldClocks=clockPreferences;
+        var layouts=new List<object>();bool fits=true;var oldClocks=clockPreferences;double hdLogicalWidth=0,hdLogicalHeight=0;
         foreach(bool showClocks in new[]{false,true}){
         clockPreferences=oldClocks with{Enabled=showClocks};
         foreach(var size in new[]{(340d,220d),(400d,430d),(560d,165d),(442d,600d),(442d,858d),(840d,260d),(840d,800d),(1200d,120d)}){
@@ -604,12 +632,12 @@ public sealed class Widget : Window
             bool fit=visible&&bounds.Bottom<=ActualHeight-10&&bounds.Right<=ActualWidth-10;fits&=fit;
             layouts.Add(new{clocksEnabled=showClocks,width=ActualWidth,height=ActualHeight,density,metricsOnly,columns=metricsOnly?metricGrid.Columns:providerGrid.Columns,scale=Math.Round(bounds.Width/body.ActualWidth,3),allReadingsVisible=visible,fits=fit});
             if(showClocks)SavePreview($"preview-{(int)size.Item1}x{(int)size.Item2}.png");
-            if(showClocks&&size.Item1==442&&size.Item2==858)SavePreview("preview-hd.png",4);
+            if(showClocks&&size.Item1==442&&size.Item2==858){hdLogicalWidth=ActualWidth;hdLogicalHeight=ActualHeight;SavePreview("preview-hd.png",4);}
         }
         }
         clockPreferences=oldClocks;
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,sensors,responsive=fits,layouts,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     static bool RunQuotaChecks()
     {
@@ -727,7 +755,7 @@ public sealed class Widget : Window
         }
         public void Arrange(double width,bool charts,bool tight){
             fontSize=tight?16:width<140?17:21;showChart=charts;
-            Element.Padding=new Thickness(7,tight?2:5,7,tight?2:5);Element.Margin=new Thickness(0,0,5,tight?3:5);
+            Element.Padding=new Thickness(7,tight?1:5,7,tight?1:5);Element.Margin=new Thickness(0,0,5,tight?3:5);
             meter.Margin=new Thickness(0,tight?2:4,0,0);
         }
         public void Set(string text,string tooltip,double? percent,List<double>? history=null,string health="ready")

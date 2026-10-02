@@ -8,7 +8,7 @@ RULES={
     'jwt':rb'\beyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\b',
     'personal-windows-path':rb'[A-Za-z]:[\\/]+Users[\\/]+(?!Public\b|Default\b)[A-Za-z0-9]',
 }
-FORBIDDEN={'data','vendor','build','work','bin','obj','__pycache__'}
+FORBIDDEN={'data','vendor','build','work','bin','obj','__pycache__','.venv'}
 def main():
     files=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
     issues=[]

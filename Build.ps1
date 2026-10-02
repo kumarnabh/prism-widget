@@ -5,8 +5,8 @@ $buildRoot=Join-Path $prismRoot 'build'
 New-Item -ItemType Directory -Force -Path $buildRoot | Out-Null
 $env:DOTNET_CLI_TELEMETRY_OPTOUT='1'
 if(-not $SkipDependencies){
-    python -m pip install --disable-pip-version-check --target (Join-Path $prismRoot 'vendor') -r (Join-Path $prismRoot 'requirements.txt')
-    if($LASTEXITCODE -ne 0){throw 'Dependency installation failed'}
+    & (Join-Path $prismRoot 'Setup.ps1') -SkipLaunch
+    if($LASTEXITCODE -ne 0){throw 'Python setup failed'}
 }
 dotnet build (Join-Path $prismRoot 'source/Prism.csproj') -c Release -t:Rebuild -o (Join-Path $buildRoot 'release') --nologo
 if($LASTEXITCODE -ne 0){throw 'Build failed'}

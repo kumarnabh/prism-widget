@@ -15,7 +15,8 @@ from quota_cache import valid_cache
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / 'data'
 WORKSPACE = DATA / 'claude-cli-workspace'
-sys.path.insert(0, str(ROOT / 'vendor'))
+if sys.prefix == sys.base_prefix:
+    sys.path.insert(0, str(ROOT / 'vendor'))  # Compatibility with earlier portable builds.
 
 
 def executable():
@@ -134,7 +135,7 @@ def collect():
     try:
         reading = read_panel(exe)
     except Exception:
-        reading = {'status': 'Unavailable', 'detail': 'Claude CLI terminal could not be read. Check the CLI setup and Python 3.14 installation.'}
+        reading = {'status': 'Unavailable', 'detail': 'Claude CLI terminal could not be read. Run Setup and check the Claude CLI connection.'}
     old = cached.get('reading', {})
     # With no machine-readable reset timestamps, never carry old windows past ten minutes.
     if not reading.get('windows') and old.get('windows') and 0 <= now-old.get('at', 0) < 600:

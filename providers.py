@@ -62,12 +62,11 @@ def codex_telemetry():
     return newest
 
 def codex():
-    try:recent=codex_telemetry()
-    except Exception:recent=None
-    if recent and recent['status']=='Recent': return recent
     try: return codex_api()
     except Exception:
-        if recent: return recent
+        try:recent=codex_telemetry()
+        except Exception:recent=None
+        if recent:return {**recent,'status':'Stale','source':'Unverified historical Codex telemetry','detail':'Historical reading only; the active Codex account could not be verified.'}
         raise
 
 def codex_api():

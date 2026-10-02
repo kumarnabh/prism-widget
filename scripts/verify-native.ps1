@@ -1,10 +1,11 @@
-param([int]$TimeoutSeconds=60)
+param([int]$TimeoutSeconds=60,[switch]$LiveAccounts)
 $ErrorActionPreference='Stop'
 $prismRoot=Split-Path $PSScriptRoot -Parent
 $executable=Join-Path $prismRoot 'Prism.exe'
 $resultPath=Join-Path $prismRoot 'selftest.json'
 $started=[DateTime]::UtcNow
-$process=Start-Process -FilePath $executable -ArgumentList '--selftest' -WorkingDirectory $prismRoot -WindowStyle Hidden -PassThru
+$mode=if($LiveAccounts){'--selftest'}else{'--offline-selftest'}
+$process=Start-Process -FilePath $executable -ArgumentList $mode -WorkingDirectory $prismRoot -WindowStyle Hidden -PassThru
 if(-not $process.WaitForExit($TimeoutSeconds*1000)){
     $process.Kill()
     throw 'Native self-test timed out.'
@@ -27,5 +28,5 @@ if($png.Length -lt 24 -or [BitConverter]::ToString($png,0,8) -ne '89-50-4E-47-0D
 function Read-PngDimension([int]$offset){return [long]$png[$offset]*16777216+[long]$png[$offset+1]*65536+[long]$png[$offset+2]*256+$png[$offset+3]}
 $hdWidth=Read-PngDimension 16
 $hdHeight=Read-PngDimension 20
-if($hdWidth -lt 1700 -or $hdHeight -lt 3400){throw 'HD preview is below the required export resolution.'}
+if($result.hdLogicalWidth -le 0 -or $result.hdLogicalHeight -le 0 -or $hdWidth -ne [Math]::Ceiling($result.hdLogicalWidth*4) -or $hdHeight -ne [Math]::Ceiling($result.hdLogicalHeight*4)){throw 'HD preview does not match the 4x logical layout resolution.'}
 Write-Host "Native checks passed: fresh results, sensors, controls, 16 layouts with clocks on/off, and $hdWidth x $hdHeight HD export."

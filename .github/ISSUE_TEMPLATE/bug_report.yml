@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible Prism issue
+body:
+  - type: markdown
+    attributes:
+      value: "Do not upload data folders, tokens, logs from provider CLIs, or private screenshots. Use SECURITY.md for vulnerabilities."
+  - type: input
+    id: version
+    attributes:
+      label: Prism version, Windows version and display scale
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected result and actual result
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Optional diagnostics
+      description: Copy from Prism's More menu → Diagnostics. Review before posting.
+      render: text

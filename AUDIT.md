@@ -1,6 +1,18 @@
 # Pre-publication review
 
-Reviewed on 2026-10-02 for the 1.6 reset-reminder update.
+## 1.7 public-release review — 2026-10-02
+
+Resolved active-account Codex telemetry precedence, first/removed Claude browser account selection, clipped reminder settings on short displays, and display-size assumptions in native checks. Added isolated dependency setup, privacy-safe diagnostics, offline native testing, public documentation, MIT licensing, CI and explicit-list self-contained packaging. Debug symbols are excluded from the public archive.
+
+Local evidence: 47 mocked Python tests and three browser selector regressions passed; .NET Release build had zero warnings/errors. Native checks passed sensors, controls, clocks, reminder boundaries/deduplication, all 16 layouts at full content scale, and a 1768 × 3432 4x export. A freshly extracted self-contained package passed Setup under Windows PowerShell 5.1 and offline native checks. The packaged .NET runtime is 8.0.28 with matching upstream notices.
+
+Gitleaks 8.30.1 found no leaks in the full seven-commit history before this release, the staged public source snapshot, or the first package's content. The publication boundary check found no prohibited files/patterns. pip-audit 2.10.1 reported no known vulnerabilities for the three pinned Python requirements. Final release scans are run again at publication; GitHub Actions records hosted checks separately.
+
+Code/security review and offline tests do not establish live account acceptance, entitlement, every Windows configuration or physical mixed-DPI behavior. These scans cannot guarantee detection of every possible secret. No actual upcoming quota reset was used to test notification timing.
+
+## Prior 1.6 review
+
+Reviewed on 2026-10-02 for the reset-reminder update.
 
 ## Findings resolved
 
