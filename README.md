@@ -8,7 +8,8 @@ A glass-style Windows desktop widget for system metrics and AI subscription avai
 - Automatic Codex, Cursor Individual, OpenCode Go and Claude quota adapters.
 - Resizable layout: short windows show icons and metrics in 2, 4 or 8 columns, without scrolling. Charts appear when space permits; hover for details.
 - Optional pinning and working-set trimming for selected apps.
-- Smooth CPU and RAM history, crisp glass branding, and freshness indicators for every AI source.
+- CPU and RAM ring gauges, smooth history charts, rounded quota bars, and freshness indicators for every AI source.
+- Dashboard, Focus and Ribbon size presets, with remembered expanded height.
 - Single-instance startup and automatic recovery from malformed caches or unavailable quota sources.
 
 ## Build and run
@@ -34,7 +35,7 @@ Unknown quota displays a dash. Availability percentages are subscription allowan
 
 Drag the title to move and the lower-right grip to resize. Double-click the grip to fit height. The compact layout's □ control restores the detailed view. Hover over icons to identify metrics and inspect full readings. Free RAM asks Windows to trim eligible working-set pages from selected apps; it does not close apps, delete files or clear conversations. Memory may return immediately.
 
-The **⋯** menu keeps pinning, fit height, Free RAM and Connections accessible at every size. Keyboard shortcuts: **F5** refresh, **Ctrl+P** pin, **Ctrl+M** toggle density, **Ctrl+,** connections, and **Esc** close. Green, amber, pink and gray dots indicate current, stale, error and unavailable readings; tooltips explain the status. Charts retain up to 72 seconds of actual samples.
+The **⋯** menu keeps pinning, fit height, Free RAM and Connections accessible at every size. Keyboard shortcuts: **F5** refresh, **Ctrl+P** pin, **Ctrl+M** toggle density, **Ctrl+,** connections, and **Esc** close. Green, amber, pink and gray dots indicate current, stale, error and unavailable readings; tooltips explain the status. Charts retain up to 72 seconds of actual samples. The size presets live in the same menu. Quota values turn amber at 25% remaining and coral at 10%; freshness dots continue to describe source status. Reset countdowns follow the limiting quota window; hover for exact local reset times. The disk bar shows free space, matching its number.
 
 ## Privacy and publishing
 
