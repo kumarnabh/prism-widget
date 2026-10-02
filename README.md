@@ -54,7 +54,7 @@ AI percentages show the **lowest remaining allowance among valid reported window
 
 System readings update every two seconds. Provider collection runs each minute; adapters may reuse five-minute caches or back off after errors. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
 
-Drag the title to move and the lower-right grip to resize; double-click the grip to fit height. The **⋯** menu remains accessible at every size. Short layouts combine metrics into two, four or eight columns. Hover for labels and details.
+Drag the title to move and the lower-right grip to resize. The top toolbar's vertical-arrow icon fits height to content; double-clicking the grip does the same. The icon is available in full and compact layouts. The **⋯** menu remains accessible at every size. Short layouts combine metrics into two, four or eight columns. Hover for labels and details.
 
 | Shortcut | Action |
 | --- | --- |

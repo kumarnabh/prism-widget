@@ -1,5 +1,10 @@
 # Change log
 
+## 1.7.1 — Toolbar fit control
+
+- Moved Fit height to a crisp vector icon in the top toolbar in both full and compact layouts, with an accessible name and hover description.
+- Removed the text button beside Free RAM. Refresh intervals are unchanged.
+
 ## 1.7.0 — Public release
 
 - MIT license, installation/upgrade instructions, privacy/security guidance, contributor docs and issue templates.

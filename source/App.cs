@@ -158,6 +158,12 @@ public sealed class Widget : Window
     {
         var button=Button(small?"↻":"↻ Refresh","Refresh readings · F5",async()=>await UpdateProviders());refreshButtons.Add(button);return button;
     }
+    Button FitHeightButton()
+    {
+        var button=Button("","Fit height · fit the widget to its contents",FitHeight);
+        button.Content=new System.Windows.Shapes.Path{Data=Geometry.Parse("M2,1 L14,1 M2,15 L14,15 M8,4 L8,12 M5,7 L8,4 L11,7 M5,9 L8,12 L11,9"),Stroke=new SolidColorBrush(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
+        return button;
+    }
     void RestoreDetails(){compact=false;Height=Math.Clamp(expandedHeight,Math.Min(640,MaxHeight),MaxHeight);AdaptLayout();}
     void ApplyPreset(double width,double height)
     {
@@ -210,12 +216,13 @@ public sealed class Widget : Window
         var gripTemplate=new ControlTemplate(typeof(Thumb));var glyph=new FrameworkElementFactory(typeof(TextBlock));glyph.SetValue(TextBlock.TextProperty,"◢");glyph.SetValue(TextBlock.ForegroundProperty,Brush("#889AB5"));glyph.SetValue(TextBlock.FontSizeProperty,18d);gripTemplate.VisualTree=glyph;grip.Template=gripTemplate;
         grip.DragDelta+=(_,e)=>{Width=Math.Clamp(ActualWidth+e.HorizontalChange,MinWidth,MaxWidth);Height=Math.Clamp(ActualHeight+e.VerticalChange,MinHeight,MaxHeight);};
         grip.MouseDoubleClick+=(_,_)=>FitHeight();surface.Children.Add(grip);
-        var header=Columns(-1,136);
+        var header=Columns(-1,0);header.ColumnDefinitions[1].Width=GridLength.Auto;
         var brand=new StackPanel();brand.Children.Add(Brand(false));
         tagline=Text("SYSTEMS  /  INTELLIGENCE",9,Muted);brand.Children.Add(tagline); Add(header,brand,0);
         var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
         pin=Button("◇","Keep on top",()=>{Topmost=!Topmost;pin.Content=Topmost?"◆":"◇";metricPin.Content=pin.Content;});actions.Children.Add(pin);
         actions.Children.Add(Button("−","Compact / expanded",()=>ToggleCompact()));
+        actions.Children.Add(FitHeightButton());
         actions.Children.Add(MenuButton());Add(header,actions,1);
         header.MouseLeftButtonDown+=(_,e)=>{if(e.OriginalSource==header)DragMove();};expandedBody.Children.Add(header);
         greeting=Columns(-1,100); greeting.Margin=new Thickness(0,25,0,19);
@@ -239,7 +246,7 @@ public sealed class Widget : Window
         var disk=new StackPanel();disk.Children.Add(Text("SYSTEM DRIVE",9,Muted));diskValue.Margin=new Thickness(0,5,0,0);disk.Children.Add(diskValue);disk.Children.Add(diskBar);
         var net=new StackPanel();net.Children.Add(Text("NETWORK · ↓ / ↑",9,Muted));netValue.Margin=new Thickness(0,5,0,0);net.Children.Add(netValue);networkNote=Text("Active physical adapters",9,Muted);net.Children.Add(networkNote);Add(extras,disk,0);Add(extras,net,2);systems.Children.Add(extras);
         utilities=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,0,0,12)};
-        utilities.Children.Add(Button("Free RAM","Trim Prism or selected apps without closing them",ShowMemory));utilities.Children.Add(Button("Fit height","Fit the widget height to its contents",FitHeight));expandedBody.Children.Add(utilities);
+        utilities.Children.Add(Button("Free RAM","Trim Prism or selected apps without closing them",ShowMemory));expandedBody.Children.Add(utilities);
         section=Columns(-1,100);section.Margin=new Thickness(0,3,0,10);var label=Text("AI CAPACITY",10,Muted);label.VerticalAlignment=VerticalAlignment.Center;Add(section,label,0);
         var refresh=RefreshButton(false);Add(section,refresh,1);expandedBody.Children.Add(section);
         foreach(var spec in new[]{("codex","Codex","⌘","#6AF5E2"),("cursor","Cursor","↗","#A9D2FF"),("opencode","OpenCode Go","▣","#C2ADFF"),("claude","Claude","✳","#FFC39F")})
@@ -265,6 +272,7 @@ public sealed class Widget : Window
         actions.Children.Add(RefreshButton(true));
         metricPin=Button("◇","Toggle keep on top",()=>SetPinned(!Topmost));
         actions.Children.Add(Button("□","Restore detailed layout",RestoreDetails));
+        actions.Children.Add(FitHeightButton());
         actions.Children.Add(MenuButton());
         actions.Children.Add(Button("×","Close Prism",Close));Add(metricHeader,actions,1);
         metricHeader.Margin=new Thickness(0,0,0,6);metricBody.Children.Add(metricHeader);
