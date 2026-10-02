@@ -1,5 +1,13 @@
 # Pre-publication review
 
+## 1.8.0 desktop features — 2026-10-02
+
+Implemented tray/startup, independent schedules, low-quota alerts, local history, metric customization, profiles, verified update downloads, monitor placement/snapping and four-language core UI with clock formats. Bug review found and resolved persisted alert recovery and malformed profile clock labels. Security review found no credential/privacy issue, but identified a body-transfer timeout gap; an operation deadline and stalled-stream regression now cover it. Failed tray delivery restores pending alert state.
+
+Local Release build: zero warnings/errors. All 49 mocked Python tests and three browser tests passed in the isolated dependency environment. The global Python interpreter lacked the required terminal dependency; it was not used as a passing validation environment. Native checks cover 16 reference layouts, 480 resize transitions, 160 translated/12-hour/custom-metric variants, four rendered settings panels, and a 1768 × 3432 export. Feature checks exercise bounded preferences, history retention/deduplication, alert recovery, profile sanitization, schedules, synthetic negative/disconnected monitor geometry and mocked update integrity/redirect/body-timeout failures. Hindi widget and French settings renders were inspected.
+
+Startup registration was not enabled on the owner account during tests. Physical mixed-DPI transitions and delivery through Windows notification settings are not established by offline tests. Hosted CI and final source/package scans are recorded at publication.
+
 ## 1.7.2 adaptive controls — 2026-10-02
 
 Free RAM, Refresh and Settings now share one responsive action row. Compact layouts use accessible vector icons in the header. A breakpoint check exposed chart activation shrinking narrow grids: WPF deferred a parent measurement after visibility changed. Chart visibility now invalidates its container immediately, and charts are suppressed when the complete grid exceeds available height.

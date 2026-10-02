@@ -20,8 +20,15 @@
 - Pinning, remembered position, size presets, keyboard controls and selected-app RAM trimming.
 - Per-monitor DPI support, vector gauges/charts, and 4× exports with outlined text.
 - Copyable dependency diagnostics without account details, credentials or machine paths.
+- System tray monitoring, background notifications and optional per-user Windows startup.
+- Independent provider schedules, next-check countdowns and configurable low-quota alerts.
+- Local 24-hour, weekly and 30-day allowance history; no account identities or prompts stored.
+- Hide/reorder metrics, adjust opacity and save Work, Gaming, Presentation or custom layout profiles.
+- Screen-edge snapping and monitor-aware position restoration.
+- English, Hindi, Spanish and French core interface, with 12/24-hour clocks.
+- On-demand update checks and size/SHA-256-verified ZIP downloads from this repository.
 
-Prism is an independent community project, not affiliated with OpenAI, Cursor, Anthropic or OpenCode. Percentages represent reported subscription allowance, **not exact spendable token counts**. Provider interface changes may require adapter updates. The interface is currently English; timezone selection is global.
+Prism is an independent community project, not affiliated with OpenAI, Cursor, Anthropic or OpenCode. Percentages represent reported subscription allowance, **not exact spendable token counts**. Provider interface changes may require adapter updates. The core widget and new settings support English, Hindi, Spanish and French; provider messages, connection diagnostics and some advanced dialogs remain English. Timezone selection is global.
 
 ## Install
 
@@ -31,9 +38,9 @@ Prism is an independent community project, not affiliated with OpenAI, Cursor, A
 4. Double-click **Setup.cmd**. It creates a local `.venv`, installs pinned terminal dependencies and launches Prism. Internet is needed for this first dependency installation.
 5. Open **⋯ → Connections** for your accounts. System readings work independently.
 
-The release includes .NET; no SDK or administrator access is needed. Executables are currently **unsigned**. Windows may show an unknown-publisher warning; verify the source and checksum before deciding whether to run it. Prism creates no startup task or automatic updater.
+The release includes .NET; no SDK or administrator access is needed. Executables are currently **unsigned**. Windows may show an unknown-publisher warning; verify the source and checksum before deciding whether to run it. Windows startup is off by default and can be enabled in Settings. Update checks are manual; downloads never install or replace files automatically.
 
-**Upgrade:** close Prism, extract a new release into a separate folder, and run Setup. Privately copy the old `data` folder before launching if you want to retain settings/caches. Never share it. Reconnect optional browser/status-line integration after changing the installation path. Keep the old installation until the upgrade works.
+**Upgrade:** close Prism, extract a new release into a separate folder, and run Setup. Privately copy the old `data` folder before launching if you want to retain settings/caches. Never share it. Reconnect optional browser/status-line integration after changing the installation path. Keep the old installation until the upgrade works. If startup was enabled, turn it off in the old installation before enabling it in the new one.
 
 ## Connect accounts
 
@@ -52,7 +59,7 @@ Optional Claude browser sync and status-line feed setup is in the included [conn
 
 AI percentages show the **lowest remaining allowance among valid reported windows**: any window may limit use. Hover for all windows, source, capture time and known resets. A dash means unknown, never full. Status dots: green current, amber stale, pink error, gray unavailable. Capacity turns amber at 25% and coral at 10%.
 
-System readings update every two seconds. Provider collection runs each minute; adapters may reuse five-minute caches or back off after errors. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
+System readings update every two seconds. Default AI checks: Codex every 60 seconds; Cursor, OpenCode Go and Claude every five minutes. Settings → Refresh rates lets you choose 1/5/10/15/30/60 minutes per provider. A five-second scheduler launches only due adapters; hover a provider or the footer for its countdown. F5 requests all providers immediately but still respects provider caches and error backoff. Readings older than ten minutes are marked stale, even with a longer schedule. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
 
 Drag the title to move and the lower-right grip to resize. The top toolbar's vertical-arrow icon fits height to content; double-clicking the grip does the same. The icon is available in full and compact layouts. The **⋯** menu remains accessible at every size. Short layouts combine metrics into two, four or eight columns. Hover for labels and details.
 
@@ -63,7 +70,7 @@ Free RAM, Refresh and Settings share one action row. Below 430 pixels wide or 76
 | F5 | Refresh |
 | Ctrl+P | Pin / unpin |
 | Ctrl+M | Compact / expanded |
-| Ctrl+, | Connections |
+| Ctrl+, | Settings |
 | Esc | Close |
 
 **Free RAM** asks Windows to trim eligible working-set pages from selected apps. It does not close apps, delete files or clear conversations. Memory may return immediately and apps may briefly slow down; this is not a memory-leak repair.
@@ -72,7 +79,30 @@ Free RAM, Refresh and Settings share one action row. Below 430 pixels wide or 76
 
 **⋯ → World clocks** enables two clocks with custom labels. US Eastern/Pacific follow daylight saving, rather than fixed EST/PST year-round. Hover for dates and UTC offsets. Compact clocks reuse the header without extra rows.
 
-**⋯ → Reset reminders** offers 5/15/30/60/120 minutes, enable/disable and a preview. Default: enabled, 30 minutes. A quiet 12-second popup requires a current reading no older than ten minutes, a known future reset and **strictly more than 10% left**. Each provider/window/reset alerts once, even across restarts. Prism must be running and visible. No sound, model calls or automatic spending. Claude CLI currently has no parsed reset timestamp; browser/feed readings with timestamps can qualify.
+**⋯ → Reset reminders** offers 5/15/30/60/120 minutes, enable/disable and a preview. Default: enabled, 30 minutes. A quiet 12-second popup requires a current reading no older than ten minutes, a known future reset and **strictly more than 10% left**. Each provider/window/reset alerts once, even across restarts. Prism must be running. Visible widgets show a popup; hidden/minimized widgets use the system tray notification. Windows notification settings may suppress tray alerts. No model calls or automatic spending. Claude CLI currently has no parsed reset timestamp; browser/feed readings with timestamps can qualify.
+
+## Make it yours
+
+Open the **Settings** icon or **Ctrl+,**. The dashboard remains free of scrolling; settings pages may scroll on smaller screens.
+
+| Settings page | Controls |
+| --- | --- |
+| General | Tray, optional Windows startup, edge snapping, 12/24-hour clock, language, opacity, connections and timezone settings |
+| Refresh rates | Separate provider intervals; caches and provider backoff remain authoritative |
+| Metrics | Check visible metrics, select a row and move it up/down; at least one metric must remain |
+| Alerts | Low-quota threshold, reset reminders and local history recording |
+| Profiles | Save/replace, load or delete up to 20 layouts; built-in Work/Gaming/Presentation starters |
+| Updates | Check GitHub, download a verified ZIP and open the downloads folder |
+
+**Tray:** use More → Hide to tray or minimize. Click the tray icon to restore; right-click for Show, Refresh, Settings, History and Exit. Closing the widget or pressing Esc exits Prism. Startup launches into the tray. Notifications depend on Windows settings and Prism remaining open.
+
+**Low quota:** enabled at 20% by default; select a threshold from 5–50%. Each provider/window alerts once until it recovers above the threshold or starts a new reset cycle. Manual, stale, future or missing readings cannot trigger alerts. If no reset timestamp exists, recovery is needed to rearm that window.
+
+**History:** More → Usage history shows remaining allowance over 24 hours, 7 days or 30 days. It records fresh readings locally in five-minute buckets for up to 30 days, and draws gaps when samples are more than an hour apart. A quota reset can raise the line. It is allowance history, not a token-consumption or billing ledger. It groups by service within this installation, so changing an account continues the same service series. Disable recording in Alerts; use Clear history to erase saved points. Data is collected only while Prism runs and is not backfilled.
+
+**Layouts:** profiles include size, compact mode, pinning, opacity, metric visibility/order and clocks. They exclude sign-ins, alert settings and refresh intervals. Compact mode follows the complete chosen order; the full dashboard keeps CPU/RAM and disk/network paired and orders its AI cards. Hidden metrics still collect and can alert. Drag near a work-area edge to snap; saved monitor offsets restore with an on-screen fallback when a monitor disappears.
+
+**Updates:** checking contacts the public GitHub release API only on request. Downloads remain in `data/downloads`, match the expected release filename/size and published SHA-256, and are never executed or extracted automatically. These checks detect corruption; they are not a publisher signature. Releases remain unsigned. Use the upgrade procedure above.
 
 ## Privacy and support
 
@@ -92,7 +122,7 @@ node --test tests/popup.test.cjs
 ./Prism.exe
 ```
 
-Close Prism before rebuilding. `Build.ps1 -SkipDependencies` skips setup. Native checks use **offline account fixtures** by default, plus real system sensors. They cover controls, quota rules, reminders, clocks, 16 reference layouts, 480 forward/reverse resize checks and 4× export dimensions. `-LiveAccounts` deliberately reads your accounts and can put private quota into local screenshots. CI tests Python 3.11 and 3.14, WPF, browser behavior and Git history. Physical mixed-DPI transitions and every provider plan are not covered.
+Close Prism before rebuilding. `Build.ps1 -SkipDependencies` skips setup. Native checks use **offline account fixtures** by default, plus real system sensors. They cover controls, quota rules, reminders, clocks, 16 reference layouts, 480 forward/reverse resize checks, 160 language/clock/metric combinations, preference/history/profile round trips, alert recovery, independent scheduling, rejected update payloads/redirects/timeouts, and 4× export dimensions. `-LiveAccounts` deliberately reads your accounts and can put private quota into local screenshots. CI tests Python 3.11 and 3.14, WPF, browser behavior and Git history. Physical mixed-DPI transitions and every provider plan are not covered.
 
 See [architecture](docs/ARCHITECTURE.md), [releasing](docs/RELEASING.md), [change log](CHANGELOG.md), and [review notes](AUDIT.md). Packages use an explicit file list instead of copying a personal installation.
 

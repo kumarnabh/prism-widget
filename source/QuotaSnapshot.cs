@@ -33,7 +33,7 @@ public sealed record QuotaSnapshot(string Status,string Source,string Detail,Dat
         var limiting=Windows.OrderBy(w=>w.Remaining).FirstOrDefault();
         if(limiting?.Reset is not DateTimeOffset reset)return "";
         var span=reset-now;
-        return span.TotalDays>=1?$"Resets in {Math.Ceiling(span.TotalDays):0}d":span.TotalHours>=1?$"Resets in {Math.Ceiling(span.TotalHours):0}h":$"Resets in {Math.Max(1,Math.Ceiling(span.TotalMinutes)):0}m";
+        return span.TotalDays>=1?L.F("Resets in {0}d",Math.Ceiling(span.TotalDays)):span.TotalHours>=1?L.F("Resets in {0}h",Math.Ceiling(span.TotalHours)):L.F("Resets in {0}m",Math.Max(1,Math.Ceiling(span.TotalMinutes)));
     }
 }
 static class JsonNumbers

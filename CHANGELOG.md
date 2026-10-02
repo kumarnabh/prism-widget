@@ -1,5 +1,17 @@
 # Change log
 
+## 1.8.0 — Your workspace, your way
+
+- Added system tray monitoring, background quota notifications and optional Windows startup.
+- Independent refresh schedules/countdowns and configurable low-quota alerts.
+- Local daily/weekly/30-day allowance history with recording controls and explicit clearing.
+- Hide/reorder metrics, opacity, saved layout profiles, edge snapping and remembered monitor placement.
+- Manual GitHub update checks and verified ZIP downloads; no automatic execution or installation.
+- English, Hindi, Spanish and French core interface with 12/24-hour clocks.
+- New settings tabs keep controls out of the compact dashboard.
+- Fixed recovered-alert persistence, malformed profile clock labels, stale readings on long schedules, and full-transfer update timeouts.
+- Added isolated feature checks and 160 translated/12-hour/custom-metric layout cases.
+
 ## 1.7.2 — Adaptive action row
 
 - Consolidated Free RAM, Refresh and Settings into one row; labels collapse to accessible vector icons in narrower/shorter layouts.

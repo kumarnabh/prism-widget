@@ -7,6 +7,15 @@ TMP.mkdir(parents=True,exist_ok=True)
 import providers as p
 
 class QuotaTests(unittest.TestCase):
+    def test_selected_provider_does_not_poll_other_accounts(self):
+        with patch.object(p,'codex',return_value={'status':'Live'}) as codex, patch.object(p,'claude') as claude, patch.object(p.auto_sources,'collect_account') as accounts:
+            self.assertEqual(p.collect(['codex']),{'codex':{'status':'Live'}})
+            codex.assert_called_once();claude.assert_not_called();accounts.assert_not_called()
+    def test_invalid_or_empty_selection(self):
+        with patch.object(p,'codex') as codex, patch.object(p,'claude') as claude, patch.object(p.auto_sources,'collect_account') as accounts:
+            with self.assertRaises(ValueError): p.collect(['unknown'])
+            self.assertEqual(p.collect([]),{})
+            codex.assert_not_called();claude.assert_not_called();accounts.assert_not_called()
     def test_zero_used_is_full(self): self.assertEqual(p.window(0,None,'x')['remaining'],100)
     def test_fully_used_is_zero(self): self.assertEqual(p.window(100,None,'x')['remaining'],0)
     def test_missing_is_unknown(self): self.assertIsNone(p.window(None,None,'x'))

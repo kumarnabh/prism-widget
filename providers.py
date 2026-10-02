@@ -162,10 +162,14 @@ def manual(name):
             'at':at,'windows':[{'remaining':round(100*remaining/total,1),'label':data.get('label') or 'Saved allowance','reset':None}],
             'detail':f'{remaining:g} / {total:g} {data.get("unit","units")} remaining'}
 
-def collect():
+def collect(selected=None):
     result={}
     tasks={'codex':codex,'claude':claude,'opencode':lambda:auto_sources.collect_account('opencode'),
            'cursor':lambda:auto_sources.collect_account('cursor')}
+    if selected is not None:
+        unknown=set(selected)-tasks.keys()
+        if unknown: raise ValueError('Unknown provider selection')
+        tasks={name:fn for name,fn in tasks.items() if name in selected}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         jobs={pool.submit(fn):name for name,fn in tasks.items()}
         for future in concurrent.futures.as_completed(jobs):
@@ -175,4 +179,8 @@ def collect():
     return result
 
 if __name__=='__main__':
-    print(json.dumps(collect(),ensure_ascii=True))
+    import argparse
+    parser=argparse.ArgumentParser(description='Read selected provider quota without model prompts.')
+    parser.add_argument('--providers',nargs='+',choices=['codex','cursor','opencode','claude'])
+    args=parser.parse_args()
+    print(json.dumps(collect(args.providers),ensure_ascii=True))

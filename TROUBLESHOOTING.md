@@ -17,7 +17,12 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Claude numbers, no reminder | CLI lacks reset timestamps. Browser/feed readings can qualify if they provide a current reset. |
 | Browser account selection stuck | Select a current account explicitly in the popup, including after a saved account was removed. |
 | Native host unavailable | Run Setup and Install Claude Browser Sync.cmd in the current folder, then reload the unpacked extension. |
-| No reset alert | Needs visible/running widget, enabled reminders, fresh data, known reset in range, >10% left and a not-yet-notified reset. Preview only tests appearance. |
+| No reset alert | Needs running widget (visible or in tray), enabled reminders, fresh data, known reset in range, >10% left and a not-yet-notified reset. Preview only tests appearance. |
+| No tray notification | Check Windows notifications/Do Not Disturb and Settings → General → Enable system tray. The widget must remain running. |
+| Startup conflict | Disable Start with Windows in the old Prism installation first; registrations for another installation are preserved. |
+| Empty history | Fresh provider readings are needed while recording is enabled. Data is not backfilled. |
+| Update failed | Check connectivity to GitHub. Transfers time out after three minutes. A conflicting existing ZIP is preserved; move it before retrying. Never run a checksum-mismatched download. |
+| Hidden metric still alerts | Visibility controls the layout, not collection or alerts. Configure alerts separately. |
 | Clock one hour different | Regional Eastern/Pacific follow daylight saving, unlike fixed EST/PST. Verify selected zone and Windows timezone data. |
 | RAM rises again | Normal when apps reload trimmed pages. This does not fix leaks. |
 | Window off-screen | Close Prism and rename `data/window.json` to a backup, then reopen. |

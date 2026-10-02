@@ -10,15 +10,18 @@ Prism runs locally. There is no Prism server, analytics, crash upload or automat
 | Claude CLI | Authentication status and built-in usage panel | Claude manages its connection; normalized quota/account fingerprint cached locally |
 | Optional browser bridge | Claude organization list and quota | Organization choice in extension storage; only quota values to local native host |
 | Optional status-line feed | Recognized numeric quota fields | Local quota cache; unknown fields/conversation contents discarded |
+| History | Fresh normalized provider, timestamp and remaining percentage | Local `data/usage-history.json`, retained up to 30 days |
+| Update checker | Public GitHub release metadata and ZIP/checksum, on request | GitHub receives ordinary network metadata; verified downloads stay in `data/downloads` |
+| Startup | Explicit opt-in per Windows user | Quoted local executable path under HKCU Run; no service or scheduled task |
 | Diagnostics | Runtime versions, architecture, OS family, dependency/CLI availability | Screen; clipboard only when you choose Copy |
 
-`data/` contains consent, caches, fingerprints, clocks, reminder history, window preferences and a dedicated Claude CLI workspace. Treat it as private even though Prism does not deliberately persist raw credentials. Claude may create files according to its own behavior. Self-tests create local screenshots and sensor reports; live-account tests may include quota in screenshots. Prism error logs contain exception class names rather than raw responses.
+`data/` contains consent, caches, fingerprints, clocks, reminder history, window/metric/language preferences, layout profiles, numeric usage history, downloaded updates and a dedicated Claude CLI workspace. Treat it as private even though Prism does not deliberately persist raw credentials. Claude may create files according to its own behavior. Self-tests create local screenshots and sensor reports; live-account tests may include quota in screenshots. Prism error logs contain exception class names rather than raw responses.
 
 Prism submits no model prompts. Provider apps/CLIs retain responsibility for their own authentication/network policies. Cursor and Go reject redirects; the browser bridge is restricted to claude.ai. Setup contacts the configured Python package index; source builds contact NuGet.
 
 ## Control and removal
 
-Disable Cursor/Go reuse in Connections to stop those adapters. Revoke sign-ins through the original provider app. Close Prism to stop its collection. Remove the optional extension to stop browser polling.
+Disable Cursor/Go reuse in Connections to stop those adapters. Revoke sign-ins through the original provider app. Close/Exit Prism to stop its collection; hiding to the tray keeps it running. History recording can be disabled in Settings → Alerts; clear prior records in Usage history. History is pruned on load and while recording, so a closed or disabled installation can retain its existing file until reopened or cleared. Remove the optional extension to stop browser polling.
 
 The browser installer registers `com.prism.widget` under these **current-user** keys:
 
@@ -27,7 +30,7 @@ HKCU\Software\Google\Chrome\NativeMessagingHosts\com.prism.widget
 HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.prism.widget
 ```
 
-To uninstall the bridge, remove its extension and these two Prism-specific keys after checking they point to your installation's `native-host.json`. Do not remove other native hosts. Remove any Prism status-line command from Claude settings or restore your prior command. Removing the extracted installation, including `.venv` and `data`, erases Prism's local state. Prism installs no system service or startup task.
+To uninstall the bridge, remove its extension and these two Prism-specific keys after checking they point to your installation's `native-host.json`. Do not remove other native hosts. Remove any Prism status-line command from Claude settings or restore your prior command. Removing the extracted installation, including `.venv` and `data`, erases Prism's local state. Prism installs no system service or scheduled task. Optional startup writes only the `PrismWidget` value under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Disable Start with Windows before removing/moving the installation. Prism will not overwrite another installation's startup value.
 
 ## Sharing
 

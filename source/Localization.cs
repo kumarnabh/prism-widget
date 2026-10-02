@@ -1,0 +1,162 @@
+using System.Globalization;
+using System.Windows;
+
+namespace Prism;
+
+public static class L
+{
+    public static string Language {get;private set;}="en";
+    // Each row is English | Hindi | Spanish | French. Provider names stay unchanged.
+    static readonly Dictionary<string,string[]> Words=new(StringComparer.Ordinal);
+    static L()
+    {
+        foreach(var row in Data.Split('\n',StringSplitOptions.RemoveEmptyEntries)){
+            var fields=row.Trim().Split('|');if(fields.Length==4)Words[fields[0]]=fields;
+        }
+    }
+    public static bool Known(string text)=>Words.ContainsKey(text);
+    public static string T(string text)=>Words.TryGetValue(text,out var values)?values[Language switch{"hi"=>1,"es"=>2,"fr"=>3,_=>0}]:text;
+    public static string F(string format,params object[] values)=>string.Format(CultureInfo.CurrentCulture,T(format),values);
+    public static string Time(DateTimeOffset time,bool use24,bool compact=false)=>time.ToString(use24?"HH:mm":compact?"h:mmtt":"h:mm tt",compact?CultureInfo.InvariantCulture:CultureInfo.CurrentCulture);
+    public static void Set(string language)
+    {
+        Language=new[]{"en","hi","es","fr"}.Contains(language)?language:"en";
+        var culture=CultureInfo.GetCultureInfo(Language switch{"hi"=>"hi-IN","es"=>"es-ES","fr"=>"fr-FR",_=>"en-US"});
+        CultureInfo.CurrentCulture=culture;CultureInfo.CurrentUICulture=culture;
+        CultureInfo.DefaultThreadCurrentCulture=culture;CultureInfo.DefaultThreadCurrentUICulture=culture;
+        if(Application.Current is not null)foreach(var key in Words.Keys)Application.Current.Resources["t."+key]=T(key);
+    }
+    const string Data="""
+Settings|सेटिंग्स|Ajustes|Réglages
+Connect this source to see its allowance.|कोटा देखने के लिए इस स्रोत से जुड़ें।|Conecte esta fuente para ver su cuota.|Connectez cette source pour voir son quota.
+No current quota window · waiting for a fresh reading|कोई ताज़ा कोटा नहीं · नई रीडिंग की प्रतीक्षा|Sin cuota actual · esperando datos nuevos|Aucun quota actuel · attente d’un nouveau relevé
+Recent|हाल का|Reciente|Récent
+Close Prism|Prism बंद करें|Cerrar Prism|Fermer Prism
+More controls|और नियंत्रण|Más controles|Autres commandes
+Settings · accounts, clocks and reminders|सेटिंग्स · खाते, घड़ियाँ और अनुस्मारक|Ajustes · cuentas, relojes y avisos|Réglages · comptes, horloges et rappels
+Free RAM · trim selected apps without closing them|रैम खाली करें · ऐप बंद किए बिना|Liberar RAM · sin cerrar las aplicaciones|Libérer RAM · sans fermer les applications
+Refresh AI readings · F5|AI रीडिंग रिफ्रेश करें · F5|Actualizar lecturas IA · F5|Actualiser les relevés IA · F5
+Fit height · fit the widget to its contents|ऊँचाई सामग्री के अनुसार करें|Ajustar altura al contenido|Ajuster la hauteur au contenu
+Free RAM|रैम खाली करें|Liberar RAM|Libérer RAM
+Refresh|रिफ्रेश|Actualizar|Actualiser
+General|सामान्य|General|Général
+Refresh rates|रिफ्रेश अंतराल|Frecuencia|Fréquence
+Metrics|मेट्रिक्स|Métricas|Mesures
+Alerts|अलर्ट|Alertas|Alertes
+Profiles|प्रोफ़ाइल|Perfiles|Profils
+Updates|अपडेट|Actualizaciones|Mises à jour
+Save|सहेजें|Guardar|Enregistrer
+Cancel|रद्द करें|Cancelar|Annuler
+Close|बंद करें|Cerrar|Fermer
+Language|भाषा|Idioma|Langue
+Use 24-hour time|24 घंटे का समय|Formato de 24 horas|Format 24 heures
+Enable system tray|सिस्टम ट्रे सक्षम करें|Activar bandeja del sistema|Activer la zone de notification
+Start with Windows|Windows के साथ शुरू करें|Iniciar con Windows|Démarrer avec Windows
+Snap to screen edges|स्क्रीन किनारों से जोड़ें|Ajustar a los bordes|Aligner sur les bords
+Opacity|अपारदर्शिता|Opacidad|Opacité
+Save local quota history|कोटा इतिहास स्थानीय सहेजें|Guardar historial local|Enregistrer l’historique local
+Enable low-quota alerts|कम कोटा अलर्ट सक्षम करें|Alertas de cuota baja|Alertes de quota faible
+Remaining threshold (%)|शेष सीमा (%)|Umbral restante (%)|Seuil restant (%)
+Move up|ऊपर करें|Subir|Monter
+Move down|नीचे करें|Bajar|Descendre
+At least one metric is required.|कम से कम एक मेट्रिक आवश्यक है।|Se requiere al menos una métrica.|Une mesure au minimum est requise.
+Save current layout|वर्तमान लेआउट सहेजें|Guardar diseño actual|Enregistrer la disposition
+Load profile|प्रोफ़ाइल लोड करें|Cargar perfil|Charger le profil
+Delete profile|प्रोफ़ाइल हटाएँ|Eliminar perfil|Supprimer le profil
+Profile name|प्रोफ़ाइल नाम|Nombre del perfil|Nom du profil
+Check for updates|अपडेट जाँचें|Buscar actualizaciones|Rechercher des mises à jour
+Download verified ZIP|सत्यापित ZIP डाउनलोड करें|Descargar ZIP verificado|Télécharger le ZIP vérifié
+Open downloads folder|डाउनलोड फ़ोल्डर खोलें|Abrir carpeta de descargas|Ouvrir les téléchargements
+Checking…|जाँच जारी…|Comprobando…|Vérification…
+Downloading and verifying…|डाउनलोड और सत्यापन जारी…|Descargando y verificando…|Téléchargement et vérification…
+You are up to date.|आपका संस्करण अद्यतन है।|Está actualizado.|Vous êtes à jour.
+Verified download ready. Extract it into a new folder and run Setup.cmd.|सत्यापित डाउनलोड तैयार है। नए फ़ोल्डर में निकालें और Setup.cmd चलाएँ।|Descarga verificada. Extraiga en una carpeta nueva y ejecute Setup.cmd.|Téléchargement vérifié. Extrayez dans un nouveau dossier et lancez Setup.cmd.
+Update check failed. Please try again later.|अपडेट जाँच विफल। बाद में पुनः प्रयास करें।|No se pudo comprobar. Inténtelo más tarde.|Échec de la vérification. Réessayez plus tard.
+Download failed or could not be verified.|डाउनलोड विफल या सत्यापन असफल।|Descarga fallida o no verificada.|Téléchargement échoué ou non vérifié.
+Prism {0} is available ({1:0} MB).|Prism {0} उपलब्ध है ({1:0} MB)।|Prism {0} disponible ({1:0} MB).|Prism {0} disponible ({1:0} Mo).
+Usage history|उपयोग इतिहास|Historial de uso|Historique d’utilisation
+24 hours|24 घंटे|24 horas|24 heures
+7 days|7 दिन|7 días|7 jours
+30 days|30 दिन|30 días|30 jours
+Clear history|इतिहास साफ करें|Borrar historial|Effacer l’historique
+Clear the local quota history? This cannot be undone.|स्थानीय कोटा इतिहास साफ करें? इसे पूर्ववत नहीं किया जा सकता।|¿Borrar el historial local? No se puede deshacer.|Effacer l’historique local ? Cette action est irréversible.
+No readings yet. History fills as fresh quota arrives.|अभी रीडिंग नहीं है। ताज़ा कोटा आने पर इतिहास भरेगा।|Sin lecturas aún. El historial se llenará con datos nuevos.|Aucune donnée. L’historique se remplira au fil des relevés.
+Remaining allowance (%)|शेष कोटा (%)|Cuota restante (%)|Quota restant (%)
+{0} samples · latest {1:0.#}%|{0} नमूने · नवीनतम {1:0.#}%|{0} muestras · último {1:0.#}%|{0} relevés · dernier {1:0.#}%
+Show Prism|Prism दिखाएँ|Mostrar Prism|Afficher Prism
+Hide to tray|ट्रे में छिपाएँ|Ocultar en la bandeja|Masquer dans la zone de notification
+Exit Prism|Prism बंद करें|Salir de Prism|Quitter Prism
+Low quota|कम कोटा|Cuota baja|Quota faible
+Quota resets soon|कोटा जल्द रीसेट होगा|La cuota se restablece pronto|Réinitialisation du quota proche
+Next check: {0}|अगली जाँच: {0}|Próxima consulta: {0}|Prochaine vérification : {0}
+{0} of 4 sources current|4 में से {0} स्रोत ताज़ा|{0} de 4 fuentes al día|{0} sources sur 4 à jour
+Refresh failed; scheduled checks will retry.|रिफ्रेश विफल; निर्धारित जाँच पुनः प्रयास करेगी।|Actualización fallida; se reintentará.|Échec ; nouvelle tentative planifiée.
+Workspace pulse|कार्यस्थल की स्थिति|Estado del espacio|État de l’espace
+Live system health. AI capacity in view.|सिस्टम की स्थिति और AI क्षमता।|Estado del sistema y capacidad IA.|État du système et capacité IA.
+PROCESSOR|प्रोसेसर|PROCESADOR|PROCESSEUR
+MEMORY|मेमोरी|MEMORIA|MÉMOIRE
+SYSTEM DRIVE|सिस्टम ड्राइव|DISCO DEL SISTEMA|DISQUE SYSTÈME
+NETWORK · ↓ / ↑|नेटवर्क · ↓ / ↑|RED · ↓ / ↑|RÉSEAU · ↓ / ↑
+AI CAPACITY|AI क्षमता|CAPACIDAD IA|CAPACITÉ IA
+CPU|सीपीयू|CPU|CPU
+Memory|मेमोरी|Memoria|Mémoire
+Free disk|खाली डिस्क|Disco libre|Disque libre
+Network|नेटवर्क|Red|Réseau
+Keep on top|सबसे ऊपर रखें|Siempre visible|Toujours au premier plan
+Unpin widget|पिन हटाएँ|Desanclar|Détacher
+Fit to content|सामग्री के अनुसार आकार|Ajustar al contenido|Ajuster au contenu
+Toggle compact view|कॉम्पैक्ट दृश्य बदलें|Vista compacta|Vue compacte
+Connections…|कनेक्शन…|Conexiones…|Connexions…
+World clocks…|विश्व घड़ियाँ…|Relojes mundiales…|Horloges mondiales…
+Reset reminders…|रीसेट अनुस्मारक…|Avisos de reinicio…|Rappels de réinitialisation…
+Diagnostics…|निदान…|Diagnóstico…|Diagnostic…
+{0:0.#}% left|{0:0.#}% शेष|{0:0.#}% restante|{0:0.#}% restant
+{0:0.0} GB free|{0:0.0} GB खाली|{0:0.0} GB libres|{0:0.0} Go libres
+Live|ताज़ा|En vivo|Actuel
+Stale|पुराना|Desactualizado|Périmé
+Connect|कनेक्ट करें|Conectar|Connecter
+Waiting|प्रतीक्षा|Esperando|En attente
+Unavailable|अनुपलब्ध|No disponible|Indisponible
+just now|अभी|ahora|à l’instant
+{0:0}m ago|{0:0} मिनट पहले|hace {0:0} min|il y a {0:0} min
+{0:0}h ago|{0:0} घंटे पहले|hace {0:0} h|il y a {0:0} h
+Resets in {0}d|{0} दिन में रीसेट|Reinicio en {0} d|Réinitialisation dans {0} j
+Resets in {0}h|{0} घंटे में रीसेट|Reinicio en {0} h|Réinitialisation dans {0} h
+Resets in {0}m|{0} मिनट में रीसेट|Reinicio en {0} min|Réinitialisation dans {0} min
+Show two additional timezone clocks|दो अतिरिक्त समयक्षेत्र घड़ियाँ दिखाएँ|Mostrar dos relojes adicionales|Afficher deux horloges supplémentaires
+Save clocks|घड़ियाँ सहेजें|Guardar relojes|Enregistrer les horloges
+Enable reset reminders|रीसेट अनुस्मारक सक्षम करें|Activar avisos de reinicio|Activer les rappels
+Save reminders|अनुस्मारक सहेजें|Guardar avisos|Enregistrer les rappels
+Preview reminder|अनुस्मारक पूर्वावलोकन|Vista previa del aviso|Aperçu du rappel
+Copy report|रिपोर्ट कॉपी करें|Copiar informe|Copier le rapport
+due now|अभी जाँच|ahora|maintenant
+Saved.|सहेजा गया।|Guardado.|Enregistré.
+Could not save settings.|सेटिंग्स सहेजी नहीं जा सकीं।|No se pudieron guardar los ajustes.|Impossible d’enregistrer les réglages.
+Enter a profile name.|प्रोफ़ाइल का नाम लिखें।|Introduzca un nombre.|Saisissez un nom de profil.
+Maximum 20 profiles.|अधिकतम 20 प्रोफ़ाइल।|Máximo 20 perfiles.|20 profils maximum.
+Could not save profile.|प्रोफ़ाइल सहेजी नहीं जा सकी।|No se pudo guardar el perfil.|Impossible d’enregistrer le profil.
+System tray is unavailable. Prism will stay visible.|सिस्टम ट्रे उपलब्ध नहीं है। Prism दिखाई देगा।|Bandeja no disponible. Prism seguirá visible.|Zone de notification indisponible. Prism restera visible.
+Could not save settings. Check folder access or an existing startup registration.|सेटिंग्स सहेजी नहीं जा सकीं। फ़ोल्डर की अनुमति या मौजूदा स्टार्टअप प्रविष्टि जाँचें।|No se pudo guardar. Compruebe los permisos de carpeta o el registro de inicio existente.|Enregistrement impossible. Vérifiez les droits du dossier ou l’entrée de démarrage existante.
+Startup is optional and uses only your Windows account. Closing Prism exits; Hide to tray keeps monitoring.|स्टार्टअप वैकल्पिक है और केवल आपका Windows खाता उपयोग करता है। बंद करने पर Prism रुकेगा; ट्रे में छिपाने पर निगरानी जारी रहेगी।|El inicio automático es opcional y solo usa su cuenta de Windows. Cerrar Prism termina la aplicación; ocultarlo mantiene la supervisión.|Le démarrage automatique est facultatif et propre à votre compte Windows. Fermer Prism quitte l’application ; la masquer maintient le suivi.
+Provider caches and rate limits still apply. Hover a provider or the footer for its next check.|प्रदाता की कैश और दर सीमाएँ लागू रहती हैं। अगली जाँच देखने के लिए प्रदाता या नीचे की पट्टी पर माउस रखें।|Se siguen aplicando las cachés y límites del proveedor. Pase el cursor sobre un proveedor o el pie para ver la próxima consulta.|Les caches et limites du fournisseur s’appliquent. Survolez un fournisseur ou le pied de page pour voir la prochaine vérification.
+Choose visible metrics and their order. The compact grid uses the full order; the dashboard keeps paired system groups and orders AI cards.|दिखने वाले मेट्रिक्स और उनका क्रम चुनें। कॉम्पैक्ट ग्रिड पूरा क्रम अपनाता है; डैशबोर्ड सिस्टम के जोड़े रखता है और AI कार्ड क्रमबद्ध करता है।|Elija las métricas visibles y su orden. La cuadrícula compacta respeta todo el orden; el panel conserva los grupos del sistema y ordena las tarjetas IA.|Choisissez les mesures visibles et leur ordre. La grille compacte suit cet ordre ; le tableau conserve les paires système et trie les cartes IA.
+Each low-quota window alerts once until it recovers or resets. Background alerts use Windows notifications; your notification settings may suppress them.|हर कम-कोटा अवधि में एक बार अलर्ट आता है, जब तक कोटा सुधरे या रीसेट हो। पृष्ठभूमि अलर्ट Windows सूचनाओं से आते हैं; आपकी सेटिंग्स उन्हें रोक सकती हैं।|Cada período avisa una vez hasta recuperarse o reiniciarse. Las alertas en segundo plano usan notificaciones de Windows, que sus ajustes pueden bloquear.|Chaque période alerte une fois jusqu’au rétablissement ou à la réinitialisation. Les alertes utilisent les notifications Windows, selon vos réglages.
+History stores only provider, timestamp and remaining percentage for 30 days. Disabling recording preserves existing history until you clear it.|इतिहास में केवल प्रदाता, समय और शेष प्रतिशत 30 दिन तक सहेजे जाते हैं। रिकॉर्डिंग बंद करने से मौजूदा इतिहास नहीं मिटता।|El historial guarda solo proveedor, fecha y porcentaje restante durante 30 días. Desactivar el registro conserva el historial hasta borrarlo.|L’historique conserve uniquement le fournisseur, la date et le pourcentage restant pendant 30 jours. Désactiver l’enregistrement ne l’efface pas.
+Profiles save size, density, pinning, opacity, visible metrics, order and clocks. They never include account credentials.|प्रोफ़ाइल आकार, घनत्व, पिन, अपारदर्शिता, मेट्रिक्स, क्रम और घड़ियाँ सहेजती हैं। इनमें खाते की साइन-इन जानकारी नहीं होती।|Los perfiles guardan tamaño, densidad, anclaje, opacidad, métricas, orden y relojes. Nunca incluyen credenciales.|Les profils enregistrent taille, densité, épinglage, opacité, mesures, ordre et horloges. Ils ne contiennent jamais d’identifiants.
+Checks contact GitHub only when requested. ZIPs are verified against the published SHA-256 checksum. Binaries remain unsigned; downloads never install or replace files automatically.|जाँच केवल आपके अनुरोध पर GitHub से संपर्क करती है। ZIP का प्रकाशित SHA-256 से सत्यापन होता है। ऐप अभी बिना डिजिटल हस्ताक्षर के है; डाउनलोड स्वतः इंस्टॉल या फ़ाइलें नहीं बदलते।|GitHub solo se consulta a petición. Los ZIP se verifican con el SHA-256 publicado. Los binarios no están firmados; las descargas no instalan ni reemplazan archivos automáticamente.|GitHub est contacté uniquement sur demande. Les ZIP sont vérifiés avec le SHA-256 publié. Les exécutables ne sont pas signés ; aucun fichier n’est installé ou remplacé automatiquement.
+SYSTEMS  /  INTELLIGENCE|सिस्टम  /  इंटेलिजेंस|SISTEMA  /  INTELIGENCIA|SYSTÈME  /  INTELLIGENCE
+Active physical adapters|सक्रिय नेटवर्क एडेप्टर|Adaptadores físicos activos|Cartes réseau actives
+System live · AI readings carry their own timestamp|सिस्टम ताज़ा · AI रीडिंग का अपना समय है|Sistema en vivo · cada lectura IA tiene su fecha|Système en direct · chaque relevé IA est horodaté
+Reading memory|मेमोरी पढ़ रहे हैं|Leyendo memoria|Lecture de la mémoire
+Connecting to your workspace|कार्यस्थल से जुड़ रहे हैं|Conectando al espacio|Connexion à votre espace
+Connecting…|जुड़ रहे हैं…|Conectando…|Connexion…
+WAITING|प्रतीक्षा|ESPERANDO|EN ATTENTE
+Network download / upload|नेटवर्क डाउनलोड / अपलोड|Descarga / subida de red|Téléchargement / envoi réseau
+A nudge before the reset|रीसेट से पहले याद दिलाएँ|Un aviso antes del reinicio|Un rappel avant la réinitialisation
+Remind me before reset|रीसेट से पहले याद दिलाएँ|Avisar antes del reinicio|Me rappeler avant la réinitialisation
+Only current readings with a known reset time qualify. Prism must be running, either visible or in the system tray.|केवल ज्ञात रीसेट समय वाली ताज़ा रीडिंग योग्य हैं। Prism दिखाई देते हुए या सिस्टम ट्रे में चलता रहना चाहिए।|Solo se usan lecturas actuales con reinicio conocido. Prism debe estar ejecutándose, visible o en la bandeja.|Seuls les relevés actuels avec réinitialisation connue sont utilisés. Prism doit fonctionner, visible ou dans la zone de notification.
+Two places. One glance.|दो जगहें। एक नज़र।|Dos lugares. Un vistazo.|Deux lieux. Un regard.
+Add two clocks alongside your local time. Daylight saving is handled by Windows. Hover a clock for its date and UTC offset.|स्थानीय समय के साथ दो घड़ियाँ जोड़ें। ग्रीष्मकालीन समय Windows सँभालता है। तारीख और UTC अंतर के लिए घड़ी पर माउस रखें।|Añada dos relojes a su hora local. Windows gestiona el horario de verano. Pase el cursor para ver fecha y desfase UTC.|Ajoutez deux horloges à l’heure locale. Windows gère l’heure d’été. Survolez pour voir la date et le décalage UTC.
+Show a quiet, 12-second reminder when a quota window is about to reset and more than 10% remains. Each window alerts once per reset, even across restarts.|कोटा रीसेट होने वाला हो और 10% से अधिक शेष हो तो 12 सेकंड का शांत अनुस्मारक दिखाएँ। हर अवधि में एक बार अलर्ट, ऐप पुनः खोलने पर भी।|Muestra un aviso discreto de 12 segundos antes del reinicio si queda más del 10%. Cada período avisa una vez, incluso tras reiniciar la aplicación.|Affiche un rappel discret de 12 secondes avant une réinitialisation s’il reste plus de 10 %. Une alerte par période, même après redémarrage.
+""";
+}

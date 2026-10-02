@@ -14,7 +14,7 @@ if($process.ExitCode -ne 0){throw "Native self-test exited with code $($process.
 if(-not (Test-Path -LiteralPath $resultPath)){throw 'Native self-test did not produce results.'}
 if((Get-Item -LiteralPath $resultPath).LastWriteTimeUtc -lt $started){throw 'Native self-test results are stale.'}
 $result=Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets','clocks','reminders')){
+foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets','clocks','reminders','featureChecks')){
     if($result.$check -ne $true){throw "Native check failed: $check"}
 }
 if($result.layouts.Count -ne 16){throw 'Expected eight layouts with clocks both on and off.'}
@@ -25,6 +25,10 @@ if($result.transitions.Count -ne 480){throw 'Expected 480 forward/reverse resize
 foreach($layout in $result.transitions){
     if($layout.fits -ne $true -or $layout.controls -ne $true -or $layout.scale -lt 0.999){throw "Resize transition failed: $($layout.width) x $($layout.height), clocks=$($layout.clocksEnabled), controls=$($layout.controls), scale=$($layout.scale)"}
 }
+if($result.customized.Count -ne 160){throw 'Expected 160 language, clock format and metric selection checks.'}
+foreach($layout in $result.customized){
+    if($layout.fits -ne $true -or $layout.controls -ne $true -or $layout.selection -ne $true -or $layout.scale -lt 0.999){throw "Customized layout failed: $($layout.language), 24h=$($layout.use24), metrics=$($layout.metrics), $($layout.width) x $($layout.height), controls=$($layout.controls), scale=$($layout.scale)"}
+}
 $hdPath=Join-Path $prismRoot 'preview-hd.png'
 if(-not (Test-Path -LiteralPath $hdPath) -or (Get-Item -LiteralPath $hdPath).LastWriteTimeUtc -lt $started){throw 'HD preview missing or stale.'}
 $png=[IO.File]::ReadAllBytes($hdPath)
@@ -33,4 +37,4 @@ function Read-PngDimension([int]$offset){return [long]$png[$offset]*16777216+[lo
 $hdWidth=Read-PngDimension 16
 $hdHeight=Read-PngDimension 20
 if($result.hdLogicalWidth -le 0 -or $result.hdLogicalHeight -le 0 -or $hdWidth -ne [Math]::Ceiling($result.hdLogicalWidth*4) -or $hdHeight -ne [Math]::Ceiling($result.hdLogicalHeight*4)){throw 'HD preview does not match the 4x logical layout resolution.'}
-Write-Host "Native checks passed: sensors, controls, 16 layouts, 480 resize transitions, and $hdWidth x $hdHeight HD export."
+Write-Host "Native checks passed: sensors, controls, 16 layouts, 480 resize transitions, 160 customized layouts, isolated feature checks, and $hdWidth x $hdHeight HD export."
