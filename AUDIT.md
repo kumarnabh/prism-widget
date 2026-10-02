@@ -6,7 +6,7 @@ Implemented tray/startup, independent schedules, low-quota alerts, local history
 
 Local Release build: zero warnings/errors. All 49 mocked Python tests and three browser tests passed in the isolated dependency environment. The global Python interpreter lacked the required terminal dependency; it was not used as a passing validation environment. Native checks cover 16 reference layouts, 480 resize transitions, 160 translated/12-hour/custom-metric variants, four rendered settings panels, and a 1768 × 3432 export. Feature checks exercise bounded preferences, history retention/deduplication, alert recovery, profile sanitization, schedules, synthetic negative/disconnected monitor geometry and mocked update integrity/redirect/body-timeout failures. Hindi widget and French settings renders were inspected.
 
-Startup registration was not enabled on the owner account during tests. Physical mixed-DPI transitions and delivery through Windows notification settings are not established by offline tests. Hosted CI and final source/package scans are recorded at publication.
+A live desktop smoke check found that hiding during WPF Loaded was overridden by its initial Show. Tray creation/hiding is now queued after that transition. The follow-up check confirmed a hidden running process, duplicate-launch restoration and no duplicate instance. Startup registration was not enabled on the owner account during tests. Physical mixed-DPI transitions and delivery through Windows notification settings are not established by offline tests. Hosted CI and final source/package scans are recorded at publication.
 
 ## 1.7.2 adaptive controls — 2026-10-02
 

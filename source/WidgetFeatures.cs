@@ -37,7 +37,9 @@ public sealed partial class Widget
                 return IntPtr.Zero;
             });
         };
-        Loaded+=(_,_)=>{if(!preview&&!selftest){ConfigureTray();if(startInTray&&tray is not null)HideToTray();}};
+        // Wait until WPF finishes its initial Show; hiding inside Loaded can be
+        // overwritten by that pending visibility transition.
+        Loaded+=(_,_)=>{if(!preview&&!selftest)Dispatcher.BeginInvoke(()=>{ConfigureTray();if(startInTray&&tray is not null)HideToTray();});};
         StateChanged+=(_,_)=>{if(WindowState==WindowState.Minimized&&tray is not null)HideToTray();};
     }
     void ConfigureTray()
