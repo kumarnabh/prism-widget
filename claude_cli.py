@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from quota_cache import valid_cache
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / 'data'
@@ -111,7 +112,7 @@ def collect():
         auth = json.loads(proc.stdout)
     except Exception:
         return {'status': 'Unavailable', 'detail': 'Claude CLI authentication status could not be read.'}
-    if not auth.get('loggedIn'):
+    if not isinstance(auth,dict) or not auth.get('loggedIn'):
         return {'status': 'Connect', 'detail': 'Sign in to the Claude CLI from Settings to read subscription limits.'}
     if not subscription_auth(auth):
         return {'status': 'Connect', 'detail': 'Claude CLI needs a Claude subscription sign-in, rather than an API key.'}
@@ -120,7 +121,7 @@ def collect():
     path = DATA / 'claude-cli.json'
     try:
         cached = json.loads(path.read_text(encoding='utf-8'))
-        if cached.get('identity') != identity:
+        if not valid_cache(cached,'identity','checked') or cached.get('identity') != identity:
             cached = {}
     except (OSError, ValueError):
         cached = {}
@@ -138,7 +139,9 @@ def collect():
     # With no machine-readable reset timestamps, never carry old windows past ten minutes.
     if not reading.get('windows') and old.get('windows') and 0 <= now-old.get('at', 0) < 600:
         reading = {**old, 'status': 'Stale', 'detail': reading['detail']}
-    path.write_text(json.dumps({'identity': identity, 'checked': now, 'reading': reading}), encoding='utf-8')
+    tmp=path.with_name(f'claude-cli-{os.getpid()}-{time.time_ns()}.tmp')
+    tmp.write_text(json.dumps({'identity': identity, 'checked': now, 'reading': reading}), encoding='utf-8')
+    tmp.replace(path)
     return reading
 
 

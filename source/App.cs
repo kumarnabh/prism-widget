@@ -21,10 +21,22 @@ public class App : Application
 {
     [STAThread] public static void Main(string[] args)
     {
+        bool diagnostic=args.Contains("--preview")||args.Contains("--selftest"),created=true;
+        string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
+        using var instance=diagnostic?null:new System.Threading.Mutex(true,"Local\\PrismWidget_"+identity,out created);
+        if(!created){ActivateExisting();return;}
         var app = new App();
-        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),e.Exception+Environment.NewLine); } catch {} e.Handled=true; };
+        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true; };
         app.Run(new Widget(args.Contains("--preview"), args.Contains("--selftest")));
     }
+    static void ActivateExisting()
+    {
+        foreach(var process in Process.GetProcessesByName("Prism"))using(process)try{
+            if(process.Id!=Environment.ProcessId&&process.MainModule?.FileName==Environment.ProcessPath&&process.MainWindowHandle!=IntPtr.Zero){ShowWindow(process.MainWindowHandle,9);SetForegroundWindow(process.MainWindowHandle);return;}
+        }catch{}
+    }
+    [DllImport("user32.dll")]static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")]static extern bool ShowWindow(IntPtr window,int command);
 }
 
 public sealed class Widget : Window
@@ -38,19 +50,20 @@ public sealed class Widget : Window
     readonly Dictionary<string,MetricTile> metricTiles=new();
     Grid metricHeader=null!;
     bool metricsOnly;
+    double expandedHeight=858;
     readonly UniformGrid providerGrid=new(){Columns=1};
     readonly Viewbox fittedBody=new(){Stretch=Stretch.Uniform,StretchDirection=StretchDirection.DownOnly,VerticalAlignment=VerticalAlignment.Top,HorizontalAlignment=HorizontalAlignment.Center};
     Border frame=null!,cpuPanel=null!,ramPanel=null!;
     Grid greeting=null!,extras=null!,section=null!,bottom=null!;
     StackPanel utilities=null!;
     TextBlock tagline=null!,hint=null!,networkNote=null!;
-    Canvas cpuGraph=null!,ramGraph=null!;
+    Sparkline cpuGraph=null!,ramGraph=null!;
     bool adapting;
     int density;
     readonly TextBlock cpuValue=Text("—",38), ramValue=Text("—",38), ramDetail=Text("Reading memory",11,Muted), diskValue=Text("—",14), netValue=Text("—",14);
     readonly TextBlock clock=Text("",21), footer=Text("Connecting to your workspace",10,Muted);
-    readonly Polyline cpuLine=new(){Stroke=Brush("#7EEAD5"),StrokeThickness=2,StrokeLineJoin=PenLineJoin.Round};
-    readonly Polyline ramLine=new(){Stroke=Brush("#B3A1FF"),StrokeThickness=2,StrokeLineJoin=PenLineJoin.Round};
+
+
     readonly ProgressBar ramBar=Bar("#B3A1FF"), diskBar=Bar("#82BDFF");
     readonly Dictionary<string,ProviderCard> cards=new();
     readonly List<double> cpuHistory=new(), ramHistory=new();
@@ -59,6 +72,8 @@ public sealed class Widget : Window
     long oldReceived,oldSent; DateTime networkAt=DateTime.UtcNow;
     bool busy,closed,compact;
     Process? collector;
+    readonly System.Threading.CancellationTokenSource lifetime=new();
+    readonly List<Button> refreshButtons=new();
     readonly bool preview,selftest;
     StackPanel systems=null!;
     Button pin=null!;
@@ -72,6 +87,7 @@ public sealed class Widget : Window
         Icon=BitmapFrame.Create(new Uri("pack://application:,,,/Assets/prism.ico"));
         AllowsTransparency=true; Background=Brushes.Transparent; ResizeMode=ResizeMode.CanResize;
         MinWidth=340; MinHeight=220; MaxWidth=SystemParameters.WorkArea.Width;
+        UseLayoutRounding=true;SnapsToDevicePixels=true;TextOptions.SetTextFormattingMode(this,TextFormattingMode.Display);
         FontFamily=new FontFamily("Segoe UI"); Foreground=new SolidColorBrush(Ink);
         Resources.Add(typeof(ScrollBar),(Style)XamlReader.Parse("""
         <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ScrollBar">
@@ -98,8 +114,14 @@ public sealed class Widget : Window
                 SavePreview(); Close();
             }
         };
-        Closed+=(_,_)=>{closed=true; systemTimer.Stop();providerTimer.Stop(); if(collector is {HasExited:false}) collector.Kill(true); if(!preview&&!selftest) SavePosition();};
-        KeyDown+=(_,e)=>{if(e.Key==Key.Escape) Close();};
+        Closed+=(_,_)=>{closed=true; systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
+        KeyDown+=async (_,e)=>{
+            if(e.Key==Key.F5){await UpdateProviders();e.Handled=true;}
+            else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.P){SetPinned(!Topmost);e.Handled=true;}
+            else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.M){ToggleCompact();e.Handled=true;}
+            else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.OemComma){ShowConnection("cursor","Cursor");e.Handled=true;}
+            else if(e.Key==Key.Escape)Close();
+        };
     }
     static SolidColorBrush Brush(string hex)=>new((Color)ColorConverter.ConvertFromString(hex));
     static TextBlock Text(string value,double size=12,Color? color=null)=>new(){Text=value,FontSize=size,Foreground=new SolidColorBrush(color??Ink),TextWrapping=TextWrapping.Wrap};
@@ -111,25 +133,45 @@ public sealed class Widget : Window
         var border=new FrameworkElementFactory(typeof(Border)); border.SetValue(Border.CornerRadiusProperty,new CornerRadius(8));
         border.SetBinding(Border.BackgroundProperty,new System.Windows.Data.Binding("Background"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent});
         border.SetBinding(Border.BorderBrushProperty,new System.Windows.Data.Binding("BorderBrush"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent}); border.SetValue(Border.BorderThicknessProperty,new Thickness(1));
-        var content=new FrameworkElementFactory(typeof(ContentPresenter)); content.SetValue(FrameworkElement.MarginProperty,new Thickness(9,5,9,5)); content.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);
+        var content=new FrameworkElementFactory(typeof(ContentPresenter));content.SetBinding(FrameworkElement.MarginProperty,new System.Windows.Data.Binding("Padding"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent});content.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);
         border.AppendChild(content); template.VisualTree=border; b.Template=template;
-        b.Click+=(_,_)=>click(); b.MouseEnter+=(_,_)=>b.Background=Brush("#304359"); b.MouseLeave+=(_,_)=>b.Background=Brush("#162335"); return b;
+        System.Windows.Automation.AutomationProperties.SetName(b,tip);ToolTipService.SetInitialShowDelay(b,250);
+        b.Click+=(_,_)=>click();b.MouseEnter+=(_,_)=>b.Background=Brush("#304359");b.MouseLeave+=(_,_)=>b.Background=Brush("#162335");return b;
     }
-    static Border Panel(UIElement child,string color="#561C2A40",int radius=18)=>new(){Background=Brush(color),BorderBrush=Brush("#304C6078"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
+    static Border Panel(UIElement child,string color="#561C2A40",int radius=18)=>new(){Background=new LinearGradientBrush(Brush(color).Color,Color.FromArgb(35,31,37,60),70),BorderBrush=Brush("#385D738B"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
+    void SetPinned(bool value){Topmost=value;pin.Content=metricPin.Content=value?"◆":"◇";}
+    Button RefreshButton(bool small)
+    {
+        var button=Button(small?"↻":"↻ Refresh","Refresh readings · F5",async()=>await UpdateProviders());refreshButtons.Add(button);return button;
+    }
+    void RestoreDetails(){compact=false;Height=Math.Min(MaxHeight,Math.Max(expandedHeight,700));AdaptLayout();}
+    Button MenuButton()
+    {
+        var button=Button("···","More controls",()=>{});
+        button.Click+=(_,_)=>{
+            var menu=new ContextMenu{Background=Brush("#162235"),Foreground=new SolidColorBrush(Ink),BorderBrush=Brush("#486079"),Padding=new Thickness(6)};
+            void Item(string label,string shortcut,Action action){var item=new MenuItem{Header=label,InputGestureText=shortcut,Padding=new Thickness(10,6,10,6)};item.Click+=(_,_)=>action();menu.Items.Add(item);}
+            Item(Topmost?"Unpin widget":"Keep on top","Ctrl+P",()=>SetPinned(!Topmost));
+            Item("Fit to content","",FitHeight);Item("Restore detailed view","Ctrl+M",RestoreDetails);
+            menu.Items.Add(new Separator());Item("Free RAM…","",ShowMemory);Item("Connections…","Ctrl+,",()=>ShowConnection("cursor","Cursor"));
+            menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
+            menu.PlacementTarget=button;menu.Placement=PlacementMode.Bottom;menu.IsOpen=true;
+        };return button;
+    }
     static Grid Columns(params double[] widths)
     { var g=new Grid();foreach(var w in widths)g.ColumnDefinitions.Add(new(){Width=w<0?new GridLength(-w,GridUnitType.Star):new GridLength(w)});return g; }
     static void Add(Grid grid,UIElement el,int col){Grid.SetColumn(el,col);grid.Children.Add(el);}
     StackPanel Brand(bool small)
     {
         var brand=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
-        brand.Children.Add(new Image{Source=Icon,Width=small?20:28,Height=small?20:28,Margin=new Thickness(0,0,small?5:9,0)});
+        brand.Children.Add(new Image{Source=new BitmapImage(new Uri("pack://application:,,,/Assets/prism-icon.png")),Width=small?20:28,Height=small?20:28,Margin=new Thickness(0,0,small?5:9,0)});
         var text=Text(small?"PRISM":"P R I S M",small?13:20);text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;brand.Children.Add(text);
         brand.MouseLeftButtonDown+=(_,_)=>DragMove();return brand;
     }
     void Build()
     {
         var outer=new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Padding=new Thickness(21),BorderThickness=new Thickness(1)};frame=outer;
-        outer.Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(213,22,41,54),0),new(Color.FromArgb(218,20,27,48),.45),new(Color.FromArgb(227,24,22,46),1)},new Point(0,0),new Point(1,1));
+        outer.Background=new LinearGradientBrush(new GradientStopCollection{new(Color.FromArgb(237,15,33,43),0),new(Color.FromArgb(239,16,23,38),.45),new(Color.FromArgb(241,29,24,49),1)},new Point(0,0),new Point(1,1));
         outer.BorderBrush=new LinearGradientBrush(Brush("#8890B4C4").Color,Brush("#25485C80").Color,45);
         outer.Effect=new DropShadowEffect{Color=Colors.Black,BlurRadius=18,ShadowDepth=4,Opacity=.35};
         fittedBody.Child=body;outer.Child=fittedBody;
@@ -140,27 +182,27 @@ public sealed class Widget : Window
         grip.MouseDoubleClick+=(_,_)=>FitHeight();surface.Children.Add(grip);
         var header=Columns(-1,136);
         var brand=new StackPanel();brand.Children.Add(Brand(false));
-        tagline=Text("YOUR WORKSPACE, IN VIEW",9,Muted);brand.Children.Add(tagline); Add(header,brand,0);
+        tagline=Text("SYSTEMS  /  INTELLIGENCE",9,Muted);brand.Children.Add(tagline); Add(header,brand,0);
         var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
         pin=Button("◇","Keep on top",()=>{Topmost=!Topmost;pin.Content=Topmost?"◆":"◇";metricPin.Content=pin.Content;});actions.Children.Add(pin);
         actions.Children.Add(Button("−","Compact / expanded",()=>ToggleCompact()));
-        actions.Children.Add(Button("×","Close Prism",Close));Add(header,actions,1);
+        actions.Children.Add(MenuButton());Add(header,actions,1);
         header.MouseLeftButtonDown+=(_,e)=>{if(e.OriginalSource==header)DragMove();};expandedBody.Children.Add(header);
         greeting=Columns(-1,100); greeting.Margin=new Thickness(0,25,0,19);
-        var greetingText=new StackPanel();greetingText.Children.Add(Text("Workspace pulse",23));greetingText.Children.Add(Text("A little clarity for your busy machine.",11,Muted));Add(greeting,greetingText,0);
+        var greetingText=new StackPanel();greetingText.Children.Add(Text("Workspace pulse",23));greetingText.Children.Add(Text("Live system health. AI capacity in view.",11,Muted));Add(greeting,greetingText,0);
         clock.HorizontalAlignment=HorizontalAlignment.Right;clock.FontWeight=FontWeights.Light;Add(greeting,clock,1);expandedBody.Children.Add(greeting);
         systems=new StackPanel();expandedBody.Children.Add(systems);
         var metrics=Columns(-1,12,-1);
-        var cpu=new StackPanel();cpu.Children.Add(Text("PROCESSOR",10,Muted));cpu.Children.Add(cpuValue);cpu.Children.Add(Text($"{Environment.ProcessorCount} logical cores",11,Muted));cpuGraph=new Canvas{Height=35,Margin=new Thickness(0,9,0,0),Children={cpuLine}};cpu.Children.Add(cpuGraph);
-        var ram=new StackPanel();ram.Children.Add(Text("MEMORY",10,Muted));ram.Children.Add(ramValue);ram.Children.Add(ramDetail);ramGraph=new Canvas{Height=35,Margin=new Thickness(0,9,0,0),Children={ramLine}};ram.Children.Add(ramGraph);
+        var cpu=new StackPanel();cpu.Children.Add(Text("PROCESSOR",10,Muted));cpu.Children.Add(cpuValue);cpu.Children.Add(Text($"{Environment.ProcessorCount} logical cores",11,Muted));cpuGraph=new Sparkline("#7EEAD5"){Height=44,Margin=new Thickness(0,9,0,0)};cpu.Children.Add(cpuGraph);
+        var ram=new StackPanel();ram.Children.Add(Text("MEMORY",10,Muted));ram.Children.Add(ramValue);ram.Children.Add(ramDetail);ramGraph=new Sparkline("#B3A1FF"){Height=44,Margin=new Thickness(0,9,0,0)};ram.Children.Add(ramGraph);
         cpuPanel=Panel(cpu);ramPanel=Panel(ram,"#50332850");Add(metrics,cpuPanel,0);Add(metrics,ramPanel,2);systems.Children.Add(metrics);
         extras=Columns(-1,18,-1);extras.Margin=new Thickness(0,14,0,18);
         var disk=new StackPanel();disk.Children.Add(Text("SYSTEM DRIVE",9,Muted));diskValue.Margin=new Thickness(0,5,0,0);disk.Children.Add(diskValue);disk.Children.Add(diskBar);
         var net=new StackPanel();net.Children.Add(Text("NETWORK · ↓ / ↑",9,Muted));netValue.Margin=new Thickness(0,5,0,0);net.Children.Add(netValue);networkNote=Text("Active physical adapters",9,Muted);net.Children.Add(networkNote);Add(extras,disk,0);Add(extras,net,2);systems.Children.Add(extras);
         utilities=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,0,0,12)};
         utilities.Children.Add(Button("Free RAM","Trim Prism or selected apps without closing them",ShowMemory));utilities.Children.Add(Button("Fit height","Fit the widget height to its contents",FitHeight));expandedBody.Children.Add(utilities);
-        section=Columns(-1,100);section.Margin=new Thickness(0,3,0,10);var label=Text("AI AVAILABILITY",10,Muted);label.VerticalAlignment=VerticalAlignment.Center;Add(section,label,0);
-        var refresh=Button("↻ Refresh","Refresh AI readings",async()=>await UpdateProviders());Add(section,refresh,1);expandedBody.Children.Add(section);
+        section=Columns(-1,100);section.Margin=new Thickness(0,3,0,10);var label=Text("AI CAPACITY",10,Muted);label.VerticalAlignment=VerticalAlignment.Center;Add(section,label,0);
+        var refresh=RefreshButton(false);Add(section,refresh,1);expandedBody.Children.Add(section);
         foreach(var spec in new[]{("codex","Codex","⌘","#7EEAD5"),("cursor","Cursor","↗","#9DBDFF"),("opencode","OpenCode Go","▣","#BCA7FF"),("claude","Claude","✳","#EAB293")})
         {
             var card=new ProviderCard(spec.Item1,spec.Item2,spec.Item3,spec.Item4,()=>ShowConnection(spec.Item1,spec.Item2));
@@ -179,11 +221,10 @@ public sealed class Widget : Window
         var brand=Brand(true);Add(metricHeader,brand,0);
         metricHeader.MouseLeftButtonDown+=(_,e)=>{if(e.OriginalSource==metricHeader)DragMove();};
         var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
-        actions.Children.Add(Button("RAM","Free RAM from selected apps",ShowMemory));
-        actions.Children.Add(Button("↻","Refresh AI readings",async()=>await UpdateProviders()));
-        actions.Children.Add(Button("⚙","Settings",()=>ShowConnection("cursor","Cursor")));
-        metricPin=Button("◇","Toggle keep on top",()=>{Topmost=!Topmost;pin.Content=Topmost?"◆":"◇";metricPin.Content=pin.Content;});actions.Children.Add(metricPin);
-        actions.Children.Add(Button("□","Restore detailed layout",()=>{compact=false;Height=Math.Min(MaxHeight,Math.Max(Height,700));AdaptLayout();}));
+        actions.Children.Add(RefreshButton(true));
+        metricPin=Button("◇","Toggle keep on top",()=>SetPinned(!Topmost));
+        actions.Children.Add(Button("□","Restore detailed layout",RestoreDetails));
+        actions.Children.Add(MenuButton());
         actions.Children.Add(Button("×","Close Prism",Close));Add(metricHeader,actions,1);
         metricHeader.Margin=new Thickness(0,0,0,6);metricBody.Children.Add(metricHeader);
         foreach(var spec in new[]{("cpu","CPU","▤","#7EEAD5"),("ram","Memory","▥","#B3A1FF"),("disk","Free disk","◴","#82BDFF"),("net","Network download / upload","↕","#9BCCD7"),("codex","Codex","⌘","#7EEAD5"),("cursor","Cursor","↗","#9DBDFF"),("opencode","OpenCode Go","▣","#BCA7FF"),("claude","Claude","✳","#EAB293")}){
@@ -201,7 +242,7 @@ public sealed class Widget : Window
         metricTiles["ram"].Set(ramValue.Text,$"Memory · {ramValue.Text} · {ramDetail.Text}",ramBar.Value,ramHistory);
         metricTiles["disk"].Set(diskValue.Text.Replace(" free",""),"System drive · "+diskValue.Text,100-diskBar.Value);
         metricTiles["net"].Set(netValue.Text.Replace(" KB/s","K").Replace(" MB/s","M"),"Network download / upload · "+netValue.Text,null);
-        foreach(var (key,card) in cards)metricTiles[key].Set(card.CompactValue,card.Element.ToolTip?.ToString()??key,card.Remaining);
+        foreach(var (key,card) in cards)metricTiles[key].Set(card.CompactValue,card.Element.ToolTip?.ToString()??key,card.Remaining,health:card.Health);
     }
     void AdaptLayout()
     {
@@ -252,14 +293,14 @@ public sealed class Widget : Window
                 }
                 if(body.DesiredSize.Height<=availableHeight)break;
             }
-            Redraw(cpuHistory,cpuLine);Redraw(ramHistory,ramLine);
+            cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);
         }finally{adapting=false;}
     }
-    void FitHeight(){AdaptLayout();Height=Math.Clamp(body.DesiredSize.Height+22+frame.Padding.Top*2,MinHeight,MaxHeight);}
-    void ToggleCompact(){compact=!compact;AdaptLayout();}
+    void FitHeight(){AdaptLayout();Height=Math.Clamp(body.DesiredSize.Height+22+frame.Padding.Top*2,metricsOnly?MinHeight:Math.Max(MinHeight,640),MaxHeight);}
+    void ToggleCompact(){if(compact||metricsOnly){RestoreDetails();}else{expandedHeight=Height;compact=true;AdaptLayout();FitHeight();}}
     void LoadPosition()
     {
-        try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"window.json")));var d=doc.RootElement;if(d.TryGetProperty("width",out var w))Width=Math.Clamp(w.GetDouble(),MinWidth,MaxWidth);MinHeight=Width>=1002?120:Width>=522?165:220;if(d.TryGetProperty("height",out var h))Height=Math.Clamp(h.GetDouble(),MinHeight,MaxHeight);if(d.TryGetProperty("compact",out var c)){compact=c.GetBoolean();}Left=Math.Clamp(d.GetProperty("left").GetDouble(),SystemParameters.VirtualScreenLeft,SystemParameters.VirtualScreenLeft+SystemParameters.VirtualScreenWidth-Width);Top=Math.Clamp(d.GetProperty("top").GetDouble(),SystemParameters.VirtualScreenTop,SystemParameters.VirtualScreenTop+SystemParameters.VirtualScreenHeight-100);Topmost=d.GetProperty("topmost").GetBoolean();pin.Content=Topmost?"◆":"◇";}catch{}
+        try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"window.json")));var d=doc.RootElement;if(d.TryGetProperty("width",out var w))Width=Math.Clamp(w.GetDouble(),MinWidth,MaxWidth);MinHeight=Width>=1002?120:Width>=522?165:220;if(d.TryGetProperty("height",out var h))Height=Math.Clamp(h.GetDouble(),MinHeight,MaxHeight);if(d.TryGetProperty("compact",out var c)){compact=c.GetBoolean();}Left=Math.Clamp(d.GetProperty("left").GetDouble(),SystemParameters.VirtualScreenLeft,SystemParameters.VirtualScreenLeft+SystemParameters.VirtualScreenWidth-Width);Top=Math.Clamp(d.GetProperty("top").GetDouble(),SystemParameters.VirtualScreenTop,SystemParameters.VirtualScreenTop+SystemParameters.VirtualScreenHeight-Height);Topmost=d.GetProperty("topmost").GetBoolean();pin.Content=Topmost?"◆":"◇";}catch{}
     }
     void SavePosition(){try{File.WriteAllText(System.IO.Path.Combine(Data,"window.json"),JsonSerializer.Serialize(new{left=Left,top=Top,topmost=Topmost,width=Width,height=Height,compact}));}catch{}}
     void UpdateSystem()
@@ -267,11 +308,11 @@ public sealed class Widget : Window
         clock.Text=DateTime.Now.ToString("HH:mm");
         try {
             if(Native.GetSystemTimes(out var idle,out var kernel,out var user)) {
-                if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";Plot(cpuHistory,cpuLine,usage);}
+                if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";Plot(cpuHistory,cpuGraph,usage);}
                 oldIdle=idle;oldKernel=kernel;oldUser=user;
             }
             var mem=new Native.MemoryStatus();mem.Length=(uint)Marshal.SizeOf<Native.MemoryStatus>();
-            if(Native.GlobalMemoryStatusEx(ref mem)){var used=(mem.TotalPhys-mem.AvailPhys)/1073741824d;ramValue.Text=$"{mem.MemoryLoad}%";ramDetail.Text=$"{used:0.0} / {mem.TotalPhys/1073741824d:0.0} GB";ramBar.Value=mem.MemoryLoad;Plot(ramHistory,ramLine,mem.MemoryLoad);}
+            if(Native.GlobalMemoryStatusEx(ref mem)){var used=(mem.TotalPhys-mem.AvailPhys)/1073741824d;ramValue.Text=$"{mem.MemoryLoad}%";ramDetail.Text=$"{used:0.0} / {mem.TotalPhys/1073741824d:0.0} GB";ramBar.Value=mem.MemoryLoad;Plot(ramHistory,ramGraph,mem.MemoryLoad);}
             var drive=new DriveInfo(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!);diskValue.Text=$"{drive.AvailableFreeSpace/1073741824d:0.0} GB free";diskBar.Value=100*(1-(double)drive.AvailableFreeSpace/drive.TotalSize);
             long received=0,sent=0;foreach(var nic in NetworkInterface.GetAllNetworkInterfaces().Where(n=>n.OperationalStatus==OperationalStatus.Up&&(n.NetworkInterfaceType==NetworkInterfaceType.Ethernet||n.NetworkInterfaceType==NetworkInterfaceType.Wireless80211))) {var s=nic.GetIPv4Statistics();received+=s.BytesReceived;sent+=s.BytesSent;}
             var now=DateTime.UtcNow;var seconds=(now-networkAt).TotalSeconds;if(oldReceived>0&&seconds>0)netValue.Text=$"{Rate(Math.Max(0,received-oldReceived)/seconds)} / {Rate(Math.Max(0,sent-oldSent)/seconds)}";oldReceived=received;oldSent=sent;networkAt=now;
@@ -279,28 +320,34 @@ public sealed class Widget : Window
         AdaptLayout();
     }
     static string Rate(double bytes)=>bytes>1048576?$"{bytes/1048576:0.0} MB/s":$"{bytes/1024:0} KB/s";
-    static void Plot(List<double> history,Polyline line,double value){history.Add(value);if(history.Count>36)history.RemoveAt(0);Redraw(history,line);}
-    static void Redraw(List<double> history,Polyline line){var canvas=line.Parent as Canvas;double width=canvas?.ActualWidth??146,height=Math.Max(1,(canvas?.Height??35)-3);line.Points=new PointCollection(history.Select((v,i)=>new Point(i*Math.Max(0,width)/35,height*(1-v/100))));}
+    static void Plot(List<double> history,Sparkline chart,double value){history.Add(value);if(history.Count>36)history.RemoveAt(0);chart.SetSamples(history);}
+    void StopCollector(){try{if(collector is {HasExited:false})collector.Kill(true);}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}}
     async System.Threading.Tasks.Task UpdateProviders()
     {
-        if(busy||closed)return;busy=true;footer.Text="●  Refreshing AI readings";
+        if(busy||closed)return;busy=true;foreach(var button in refreshButtons)button.IsEnabled=false;footer.Text="●  Refreshing AI readings";
         try {
             var start=new ProcessStartInfo{FileName="python",WorkingDirectory=Root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
             start.ArgumentList.Add(System.IO.Path.Combine(Root,"providers.py"));
             collector=Process.Start(start)!; var stdout=collector.StandardOutput.ReadToEndAsync();var stderr=collector.StandardError.ReadToEndAsync();
-            using var cts=new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(45));await collector.WaitForExitAsync(cts.Token);
+            using var cts=System.Threading.CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);cts.CancelAfter(TimeSpan.FromSeconds(45));await collector.WaitForExitAsync(cts.Token);
+            if(closed)return;
             var output=await stdout;await stderr;if(collector.ExitCode!=0)throw new Exception("Collector unavailable. Check Python installation.");
             using var doc=JsonDocument.Parse(output);providers=doc.RootElement.Clone();
-            foreach(var (key,card) in cards)if(providers.TryGetProperty(key,out var data))card.Update(data);
-            footer.Text=$"●  System live  ·  {DateTime.Now:HH:mm:ss}";
-        }catch(Exception){foreach(var card in cards.Values)card.MarkOffline();footer.Text="AI refresh failed · retry in 60s";if(collector is {HasExited:false})collector.Kill(true);}
-        finally{collector?.Dispose();collector=null;busy=false;AdaptLayout();}
+            foreach(var (key,card) in cards){try{if(providers.TryGetProperty(key,out var data))card.Update(data);else card.MarkOffline();}catch{card.MarkOffline();}}
+            footer.Text=$"{cards.Values.Count(c=>c.Remaining.HasValue)} of 4 sources connected  ·  {DateTime.Now:HH:mm}";
+        }catch(Exception){if(!closed){foreach(var card in cards.Values)card.MarkOffline();footer.Text="Could not refresh · retrying in 60s";}StopCollector();}
+        finally{collector?.Dispose();collector=null;busy=false;if(!closed){foreach(var button in refreshButtons)button.IsEnabled=true;AdaptLayout();}}
     }
     void ShowConnection(string key,string name)
     {
         var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
+        if(providers.ValueKind==JsonValueKind.Object&&providers.TryGetProperty(key,out var selected)){
+            var current=new StackPanel();current.Children.Add(Text(name,16));
+            current.Children.Add(Text(selected.TryGetProperty("detail",out var explanation)?explanation.GetString()??"":selected.TryGetProperty("status",out var state)?state.GetString()??"":"Waiting",12,Muted));
+            var summary=Panel(current);summary.Margin=new Thickness(0,14,0,0);stack.Children.Add(summary);
+        }
         var desc=Text("No manual numbers. Sources refresh automatically and show when their reading was captured.",12,Muted);desc.Margin=new Thickness(0,12,0,18);stack.Children.Add(desc);
         stack.Children.Add(Text("CURSOR INDIVIDUAL + OPENCODE GO",11,Muted));
         stack.Children.Add(Text("Reuse the existing app sign-ins to read account quota. Requests go only to each provider's own usage endpoint. Prism never refreshes or saves your credentials.",12));
@@ -317,7 +364,7 @@ public sealed class Widget : Window
         dialog.ShowDialog();
     }
     static TextBox Input(StackPanel panel,string label,string value){var t=Text(label,11,Muted);t.Margin=new Thickness(0,12,0,5);panel.Children.Add(t);var input=new TextBox{Text=value,Padding=new Thickness(8),Background=Brush("#1D2C43"),Foreground=new SolidColorBrush(Ink),BorderBrush=Brush("#3E526D")};panel.Children.Add(input);return input;}
-    static void OpenUrl(string url)=>Process.Start(new ProcessStartInfo(url){UseShellExecute=true});
+    static void OpenUrl(string url){try{Process.Start(new ProcessStartInfo(url){UseShellExecute=true});}catch{MessageBox.Show("This connection could not be opened. Check that the Prism folder is complete.","Prism");}}
     sealed record MemoryApp(int Id,long Started,string Name,long Bytes);
     static List<MemoryApp> MemoryApps()
     {
@@ -381,7 +428,7 @@ public sealed class Widget : Window
     void RunSelfTest()
     {
         bool initial=Topmost;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));bool pinOk=Topmost!=initial;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
-        bool initialCompact=compact;ToggleCompact();bool compactOk=compact!=initialCompact;ToggleCompact();compactOk&=compact==initialCompact;
+        bool initialCompact=compact;double initialHeight=Height;compact=false;Height=Math.Min(MaxHeight,800);AdaptLayout();ToggleCompact();UpdateLayout();AdaptLayout();bool compactOk=metricsOnly;ToggleCompact();UpdateLayout();AdaptLayout();compactOk&=!metricsOnly;compact=initialCompact;Height=initialHeight;AdaptLayout();
         bool sensors=cpuValue.Text!="—"&&ramValue.Text!="—"&&diskValue.Text!="—";
         double oldWidth=Width,oldHeight=Height;bool oldCompact=compact;compact=false;
         var layouts=new List<object>();bool fits=true;
@@ -400,6 +447,7 @@ public sealed class Widget : Window
     sealed class ProviderCard
     {
         public Border Element{get;}
+        public string Health{get;private set;}="unknown";
         public string CompactValue=>value.Text.Replace(" left","");
         public double? Remaining=>value.Text=="—"||bar.Opacity<=.2?null:bar.Value;
         readonly TextBlock value=Text("—",22),detail=Text("Connecting…",10,Muted),status=Text("WAITING",9,Muted);
@@ -451,11 +499,11 @@ public sealed class Widget : Window
             detail.Margin=new Thickness(0,tight?3:6,0,0);
             bar.Margin=new Thickness(0,tight?4:9,0,0);
         }
-        public void MarkOffline(){status.Text="REFRESH FAILED";bar.Opacity=.3;detail.Text="Reading unavailable · click to connect";value.Text="—";Element.ToolTip=$"{name} · {status.Text}\n{detail.Text}";}
+        public void MarkOffline(){Health="error";Element.Opacity=.7;status.Text="REFRESH FAILED";bar.Opacity=.3;detail.Text="Reading unavailable · click to connect";value.Text="—";Element.ToolTip=$"{name} · {status.Text}\n{detail.Text}";}
         public void Update(JsonElement data)
         {
-            var state=data.GetProperty("status").GetString()??"Unavailable";status.Text=state.ToUpperInvariant();bar.Value=0;bar.Opacity=1;
-            var age="";if(data.TryGetProperty("at",out var at)){var sec=Math.Max(0,DateTimeOffset.UtcNow.ToUnixTimeSeconds()-at.GetDouble());age=sec<60?"just now":sec<3600?$"{sec/60:0}m ago":$"{sec/3600:0}h ago";status.Text+=" · "+age.ToUpperInvariant();}
+            var state=data.GetProperty("status").GetString()??"Unavailable";status.Text=state;bar.Value=0;bar.Opacity=1;
+            var age="";if(data.TryGetProperty("at",out var at)){var sec=Math.Max(0,DateTimeOffset.UtcNow.ToUnixTimeSeconds()-at.GetDouble());age=sec<60?"just now":sec<3600?$"{sec/60:0}m ago":$"{sec/3600:0}h ago";status.Text+=" · "+age;}
             var source=data.TryGetProperty("source",out var src)?src.GetString():"";Element.ToolTip=$"{name} · {source}\nClick to manage connection";
             if(data.TryGetProperty("windows",out var windows)&&windows.GetArrayLength()>0){
                 var all=windows.EnumerateArray().ToList();var limited=all.MinBy(w=>w.GetProperty("remaining").GetDouble());
@@ -469,6 +517,9 @@ public sealed class Widget : Window
                 double n=tokens.GetDouble();value.Text=n>=1e6?$"{n/1e6:0.0}M":n>=1000?$"{n/1000:0.0}k":$"{n:0}";
                 detail.Text="Go tokens used / 7 days · remaining quota needs setup";bar.Opacity=.2;
             }else{value.Text="—";detail.Text=data.TryGetProperty("detail",out var desc)?desc.GetString():"Click to connect";bar.Opacity=.2;}
+            Health=Remaining.HasValue?(state.Contains("Stale",StringComparison.OrdinalIgnoreCase)?"stale":"ready"):(state=="Connect"||state=="Waiting"?"unknown":"error");
+            Element.Opacity=Health=="ready"?1:Health=="stale"?.8:.72;
+            status.Foreground=Health=="stale"?Brush("#E8B96D"):Health=="error"?Brush("#DEA1A5"):new SolidColorBrush(Muted);
             Element.ToolTip=$"{name} · {source}\n{status.Text}\n{detail.Text}\nClick to manage connection";
         }
     }
@@ -476,30 +527,32 @@ public sealed class Widget : Window
     {
         public Border Element{get;}
         readonly TextBlock value=Text("—",20);
-        readonly Canvas chart=new(){Height=22,Margin=new Thickness(0,4,0,0),ClipToBounds=true};
-        readonly Polyline line;
+        readonly Sparkline chart;
+        readonly Ellipse stateDot=new(){Width=4,Height=4,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(4,0,0,0)};
         readonly ProgressBar meter;
         readonly string name;
         double fontSize=20;
         bool showChart;
         public MetricTile(string name,string icon,string color)
         {
-            this.name=name;var content=new StackPanel();var row=Columns(24,-1);
+            this.name=name;var content=new StackPanel();var row=Columns(24,-1,8);
             var mark=Text(icon,18);mark.Foreground=Brush(color);mark.VerticalAlignment=VerticalAlignment.Center;Add(row,mark,0);
-            value.Foreground=Brush(color);value.TextWrapping=TextWrapping.NoWrap;value.HorizontalAlignment=HorizontalAlignment.Right;Add(row,value,1);content.Children.Add(row);
-            line=new Polyline{Stroke=Brush(color),StrokeThickness=1.5};chart.Children.Add(line);content.Children.Add(chart);
+            value.Foreground=Brush(color);value.TextWrapping=TextWrapping.NoWrap;value.HorizontalAlignment=HorizontalAlignment.Right;Add(row,value,1);Add(row,stateDot,2);content.Children.Add(row);
+            chart=new Sparkline(color){Height=28,Margin=new Thickness(0,5,0,0)};content.Children.Add(chart);
             meter=Bar(color);meter.Height=2;meter.Margin=new Thickness(0,4,0,0);content.Children.Add(meter);
             Element=Panel(content,"#401D2A3E",12);Element.Padding=new Thickness(7,5,7,5);Element.Margin=new Thickness(0,0,5,5);Element.Focusable=true;
             System.Windows.Automation.AutomationProperties.SetName(Element,name);
         }
         public void Arrange(double width,bool charts){fontSize=width<140?17:21;showChart=charts;}
-        public void Set(string text,string tooltip,double? percent,List<double>? history=null)
+        public void Set(string text,string tooltip,double? percent,List<double>? history=null,string health="ready")
         {
             value.Text=text;value.FontSize=text.Length>8?Math.Min(fontSize,13):fontSize;
             Element.ToolTip=tooltip;System.Windows.Automation.AutomationProperties.SetName(Element,name+" · "+text);
-            meter.Value=percent??0;meter.Opacity=percent.HasValue?1:.15;
+            meter.Value=percent??0;meter.Opacity=percent.HasValue?(health=="stale"?.35:1):.15;
+            Element.Opacity=health=="ready"?1:health=="stale"?.8:.65;
+            stateDot.Fill=Brush(health=="ready"?"#7EEAD5":health=="stale"?"#E8B96D":health=="error"?"#DEA1A5":"#7A8A9D");
             chart.Visibility=showChart&&history!=null?Visibility.Visible:Visibility.Collapsed;
-            if(history!=null){double width=Math.Max(0,Element.ActualWidth-16);line.Points=new PointCollection(history.Select((v,i)=>new Point(i*width/35,20*(1-v/100))));}
+            if(history!=null)chart.SetSamples(history);
         }
     }
     static class Native

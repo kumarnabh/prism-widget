@@ -3,8 +3,9 @@
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <AssemblyName>Prism</AssemblyName><RootNamespace>Prism</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.2.0</Version>
     <ApplicationIcon>../assets/prism.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup><Resource Include="../assets/prism.ico" Link="Assets/prism.ico" /></ItemGroup>
+  <ItemGroup><Resource Include="../assets/prism-icon.png" Link="Assets/prism-icon.png" /></ItemGroup>
 </Project>

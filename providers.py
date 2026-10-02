@@ -62,7 +62,8 @@ def codex_telemetry():
     return newest
 
 def codex():
-    recent=codex_telemetry()
+    try:recent=codex_telemetry()
+    except Exception:recent=None
     if recent and recent['status']=='Recent': return recent
     try: return codex_api()
     except Exception:
@@ -107,15 +108,24 @@ def codex_api():
         except subprocess.TimeoutExpired: p.kill(); p.wait()
 
 def claude():
-    cli=claude_cli.collect()
-    if cli.get('windows'): return cli
-    browser=auto_sources.browser_claude()
-    if browser and browser.get('status')=='Browser':return browser
+    candidates=[]
+    for source in (claude_cli.collect,auto_sources.browser_claude,claude_statusline):
+        try:
+            reading=source()
+            if not isinstance(reading,dict):continue
+            if reading.get('windows') and reading.get('status') in ('CLI','Browser','Feed'):return reading
+            candidates.append(reading)
+        except Exception:continue
+    stale=[reading for reading in candidates if reading.get('windows')]
+    if stale:return max(stale,key=lambda reading:reading.get('at',0))
+    return candidates[0] if candidates else {'status':'Connect','detail':'Connect Claude Code from Settings.'}
+
+def claude_statusline():
     path=DATA/'claude-feed.json'
-    if not path.exists(): return browser or cli
+    if not path.exists(): return None
     data=json.loads(path.read_text(encoding='utf-8-sig'))
     at=data.get('at')
-    if not number(at): return {'status':'Unavailable','detail':'Claude feed has no valid timestamp.'}
+    if not number(at) or at>time.time()+300: return {'status':'Unavailable','detail':'Claude feed has no valid timestamp.'}
     windows=[]
     for key,label in [('five_hour','5-hour'),('seven_day','7-day'),('spend_limit','Spend limit')]:
         w=(data.get('rate_limits') or {}).get(key) or {}

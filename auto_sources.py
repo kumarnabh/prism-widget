@@ -1,5 +1,6 @@
 """Automatic account usage. Secrets are never returned, logged, cached or refreshed."""
 import base64, datetime, hashlib, json, os, pathlib, re, sqlite3, time, urllib.error, urllib.request
+from quota_cache import valid_cache
 
 ROOT=pathlib.Path(__file__).resolve().parent
 DATA=ROOT/'data'
@@ -123,7 +124,7 @@ def collect_account(name):
         cache={}
         try:cache=json.loads(cache_path.read_text())
         except (OSError,ValueError):pass
-        if cache.get('scope')!=fingerprint:cache={}
+        if not valid_cache(cache,'scope','retryAt') or cache.get('scope')!=fingerprint:cache={}
         if cache.get('retryAt',0)>time.time():
             result=cache.get('reading')
             if result:
@@ -146,7 +147,7 @@ def collect_account(name):
                 reading={**cache['reading'],'status':'Stale','detail':message}
                 reading['windows']=[w for w in reading['windows'] if w.get('reset') is None or w['reset']>time.time()]
                 if not reading['windows']:reading={'status':'Unavailable','detail':message}
-        DATA.mkdir(exist_ok=True);tmp=cache_path.with_suffix('.tmp');tmp.write_text(json.dumps(cache));tmp.replace(cache_path)
+        DATA.mkdir(exist_ok=True);tmp=cache_path.with_name(cache_path.stem+f'-{os.getpid()}-{time.time_ns()}.tmp');tmp.write_text(json.dumps(cache));tmp.replace(cache_path)
         return reading
     except UsageError as exc:return {'status':'Connect','detail':str(exc)}
     except Exception:return {'status':'Unavailable','detail':'Account usage could not be read. Open the provider app and refresh.'}

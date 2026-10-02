@@ -8,6 +8,8 @@ A glass-style Windows desktop widget for system metrics and AI subscription avai
 - Automatic Codex, Cursor Individual, OpenCode Go and Claude quota adapters.
 - Resizable layout: short windows show icons and metrics in 2, 4 or 8 columns, without scrolling. Charts appear when space permits; hover for details.
 - Optional pinning and working-set trimming for selected apps.
+- Smooth CPU and RAM history, crisp glass branding, and freshness indicators for every AI source.
+- Single-instance startup and automatic recovery from malformed caches or unavailable quota sources.
 
 ## Build and run
 
@@ -32,6 +34,8 @@ Unknown quota displays a dash. Availability percentages are subscription allowan
 
 Drag the title to move and the lower-right grip to resize. Double-click the grip to fit height. The compact layout's □ control restores the detailed view. Hover over icons to identify metrics and inspect full readings. Free RAM asks Windows to trim eligible working-set pages from selected apps; it does not close apps, delete files or clear conversations. Memory may return immediately.
 
+The **⋯** menu keeps pinning, fit height, Free RAM and Connections accessible at every size. Keyboard shortcuts: **F5** refresh, **Ctrl+P** pin, **Ctrl+M** toggle density, **Ctrl+,** connections, and **Esc** close. Green, amber, pink and gray dots indicate current, stale, error and unavailable readings; tooltips explain the status. Charts retain up to 72 seconds of actual samples.
+
 ## Privacy and publishing
 
 `data/`, credentials, local connection preferences, quota caches, window state, logs, screenshots, dependencies, build output and native-host registration are excluded. Never force-add these paths. No account data is required to build or test.
@@ -42,6 +46,7 @@ Before committing:
 
 ```powershell
 python -m unittest discover -s tests -p "test_*.py"
+./scripts/verify-native.ps1
 git add <intended-source-files>
 python scripts/check_publish.py
 ```
