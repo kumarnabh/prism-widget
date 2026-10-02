@@ -1,0 +1,3 @@
+Generated using the built-in image-generation tool.
+Prompt: A premium Windows application icon for Prism, a glass-style computer and AI usage monitor. Centered faceted glass prism with a diamond-like silhouette, mint-cyan and violet refractions and an integrated pulse line. Dark midnight-blue rounded-square tile, bevelled edges, restrained glow, readable at small sizes. No text, numbers, brands, watermark or background scene. Transparent surrounding background.
+The Windows ICO is a format conversion containing 16, 24, 32, 48, 64, 128 and 256 pixel frames.

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Prism Claude Usage Sync",
+  "version": "1.1.0",
+  "description": "Automatically send Claude subscription quota to your local Prism widget. No tokens or conversation data leave the browser.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmOKv+2lfPIxd+XM1DB25rAxQmU/uxSikjk45FOB+dkrUqRMMiPa640GW2bxxbsDK35VtvSKrZcxQn3ShLV6+2PbMK4rWynsMsuhrPjR2hGqk7buNo3n/Y3XTKET6/2R3VTWkGruyBL5krhm0rgUak3Jz/XRSoo97WGI1nGAU7gA7puBwsJrdf29E9qmESbVgtLGBPQ/aoMzrxkiu16Z6/xHWTldFScB6HuM6nBv5NwqWiaTo12QgYnJKFdr3t41wbzYbtMRqmgXGN9oJNhqXe6jFS1ujiZew204NeosLTy3EDjUX/FJoIuAzZP+G+NDbH6978bR50oR4Xx5d/JbMmQIDAQAB",
+  "permissions": [
+    "alarms",
+    "storage",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
