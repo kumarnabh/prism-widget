@@ -4,6 +4,7 @@
 
 A glass-style Windows desktop widget for system metrics and AI subscription availability.
 
+- Bright cyan/violet glass, higher-contrast text, and vector gauges with explicit per-monitor DPI support.
 - Live CPU, memory, free disk and network throughput.
 - Automatic Codex, Cursor Individual, OpenCode Go and Claude quota adapters.
 - Resizable layout: short windows show icons and metrics in 2, 4 or 8 columns, without scrolling. Charts appear when space permits; hover for details.
@@ -53,6 +54,8 @@ python scripts/check_publish.py
 ```
 
 The publication check examines the exact staged bytes and reports only paths/rule names. Use a dedicated scanner such as Gitleaks as a second check. Scanning reduces risk; it cannot guarantee the absence of every possible secret or bug.
+
+The native self-test also writes `preview-hd.png`, a 3× render with text reformatted at the target DPI. The shadow is isolated behind the content. All eight reference layouts fit at content scale 1. DPI configuration follows [Microsoft’s manifest guidance](https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process). Mixed-monitor movement has not been physically tested.
 
 ## Implementation
 

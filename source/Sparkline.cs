@@ -14,7 +14,7 @@ public sealed class Sparkline : FrameworkElement
     {
         base.OnRender(dc);double width=ActualWidth,height=ActualHeight;
         if(width<4||height<4)return;
-        var gridPen=new Pen(new SolidColorBrush(Color.FromArgb(22,170,194,215)),.6);
+        var gridPen=new Pen(new SolidColorBrush(Color.FromArgb(38,170,194,215)),.6);
         foreach(double fraction in new[]{.25,.75})dc.DrawLine(gridPen,new Point(0,height*fraction),new Point(width,height*fraction));
         if(samples.Length==0)return;
         double pad=2,usableHeight=height-2*pad;
@@ -28,8 +28,8 @@ public sealed class Sparkline : FrameworkElement
             for(int i=1;i<points.Length;i++){double middle=(points[i-1].X+points[i].X)/2;context.BezierTo(new Point(middle,points[i-1].Y),new Point(middle,points[i].Y),points[i],true,false);}
             context.LineTo(new Point(points[^1].X,height),true,false);
         }
-        var fill=new LinearGradientBrush(Color.FromArgb(55,accent.R,accent.G,accent.B),Color.FromArgb(0,accent.R,accent.G,accent.B),90);
-        dc.DrawGeometry(fill,null,area);dc.DrawGeometry(null,new Pen(new SolidColorBrush(accent),1.6){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round},stroke);
+        var fill=new LinearGradientBrush(Color.FromArgb(88,accent.R,accent.G,accent.B),Color.FromArgb(0,accent.R,accent.G,accent.B),90);
+        dc.DrawGeometry(fill,null,area);dc.DrawGeometry(null,new Pen(new SolidColorBrush(accent),2){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round},stroke);
         dc.DrawEllipse(new SolidColorBrush(accent),null,points[^1],2,2);
     }
 }

@@ -18,6 +18,6 @@ foreach($check in @('pin','compact','sensors','responsive','providers','quotaVal
 }
 if($result.layouts.Count -ne 8){throw 'Expected eight layout checks.'}
 foreach($layout in $result.layouts){
-    if($layout.fits -ne $true -or $layout.allReadingsVisible -ne $true){throw "Layout failed: $($layout.width) x $($layout.height)"}
+    if($layout.fits -ne $true -or $layout.allReadingsVisible -ne $true -or $layout.scale -lt 0.999){throw "Layout failed: $($layout.width) x $($layout.height)"}
 }
 Write-Host 'Native checks passed: fresh results, sensors, controls, and eight layouts.'
