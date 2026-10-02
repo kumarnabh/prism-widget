@@ -13,10 +13,10 @@ if($process.ExitCode -ne 0){throw "Native self-test exited with code $($process.
 if(-not (Test-Path -LiteralPath $resultPath)){throw 'Native self-test did not produce results.'}
 if((Get-Item -LiteralPath $resultPath).LastWriteTimeUtc -lt $started){throw 'Native self-test results are stale.'}
 $result=Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets')){
+foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets','clocks')){
     if($result.$check -ne $true){throw "Native check failed: $check"}
 }
-if($result.layouts.Count -ne 8){throw 'Expected eight layout checks.'}
+if($result.layouts.Count -ne 16){throw 'Expected eight layouts with clocks both on and off.'}
 foreach($layout in $result.layouts){
     if($layout.fits -ne $true -or $layout.allReadingsVisible -ne $true -or $layout.scale -lt 0.999){throw "Layout failed: $($layout.width) x $($layout.height)"}
 }
@@ -28,4 +28,4 @@ function Read-PngDimension([int]$offset){return [long]$png[$offset]*16777216+[lo
 $hdWidth=Read-PngDimension 16
 $hdHeight=Read-PngDimension 20
 if($hdWidth -lt 1700 -or $hdHeight -lt 3400){throw 'HD preview is below the required export resolution.'}
-Write-Host "Native checks passed: fresh results, sensors, controls, eight layouts, and $hdWidth x $hdHeight HD export."
+Write-Host "Native checks passed: fresh results, sensors, controls, 16 layouts with clocks on/off, and $hdWidth x $hdHeight HD export."

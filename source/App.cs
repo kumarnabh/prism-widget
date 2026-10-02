@@ -50,6 +50,12 @@ public sealed class Widget : Window
     readonly Dictionary<string,MetricTile> metricTiles=new();
     Grid metricHeader=null!;
     bool metricsOnly;
+    ClockPreferences clockPreferences=ClockPreferences.Load(System.IO.Path.Combine(Data,"clocks.json"));
+    readonly TextBlock firstTime=Text("—",19),secondTime=Text("—",19),firstZoneLabel=Text("",10,Muted),secondZoneLabel=Text("",10,Muted),compactTimes=Text("",12);
+    Grid worldClockRow=null!;
+    Border firstClock=null!,secondClock=null!;
+    StackPanel compactBrand=null!;
+    bool narrowClocks;
     double expandedHeight=858;
     readonly UniformGrid providerGrid=new(){Columns=1};
     readonly Viewbox fittedBody=new(){Stretch=Stretch.Uniform,StretchDirection=StretchDirection.DownOnly,VerticalAlignment=VerticalAlignment.Top,HorizontalAlignment=HorizontalAlignment.Center};
@@ -168,6 +174,7 @@ public sealed class Widget : Window
             Item("Focus · 560 × 220","",()=>ApplyPreset(560,220));
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
             menu.Items.Add(new Separator());Item("Free RAM…","",ShowMemory);Item("Connections…","Ctrl+,",()=>ShowConnection("cursor","Cursor"));
+            Item("World clocks…","",ShowClocks);
             menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
             menu.PlacementTarget=button;menu.Placement=PlacementMode.Bottom;menu.IsOpen=true;
         };return button;
@@ -207,6 +214,15 @@ public sealed class Widget : Window
         greeting=Columns(-1,100); greeting.Margin=new Thickness(0,25,0,19);
         var greetingText=new StackPanel();greetingText.Children.Add(Text("Workspace pulse",23));greetingText.Children.Add(Text("Live system health. AI capacity in view.",11,Muted));Add(greeting,greetingText,0);
         clock.HorizontalAlignment=HorizontalAlignment.Right;clock.FontWeight=FontWeights.Light;Add(greeting,clock,1);expandedBody.Children.Add(greeting);
+        worldClockRow=Columns(-1,8,-1);worldClockRow.Margin=new Thickness(0,0,0,12);
+        Border ClockTile(TextBlock label,TextBlock time,string color){
+            var row=Columns(-1,72);label.VerticalAlignment=VerticalAlignment.Center;label.TextTrimming=TextTrimming.CharacterEllipsis;label.TextWrapping=TextWrapping.NoWrap;
+            time.Foreground=Brush(color);time.HorizontalAlignment=HorizontalAlignment.Right;time.TextWrapping=TextWrapping.NoWrap;Add(row,label,0);Add(row,time,1);
+            var tile=Panel(row,"#75263853",12);tile.Padding=new Thickness(10,7,10,7);tile.Cursor=Cursors.Hand;tile.MouseLeftButtonUp+=(_,_)=>ShowClocks();tile.Focusable=true;
+            tile.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space){ShowClocks();e.Handled=true;}};return tile;
+        }
+        firstClock=ClockTile(firstZoneLabel,firstTime,"#6AF5E2");secondClock=ClockTile(secondZoneLabel,secondTime,"#C2ADFF");
+        Add(worldClockRow,firstClock,0);Add(worldClockRow,secondClock,2);expandedBody.Children.Add(worldClockRow);
         systems=new StackPanel();expandedBody.Children.Add(systems);
         var metrics=Columns(-1,12,-1);
         var cpu=new StackPanel();cpu.Children.Add(Text("PROCESSOR",10,Muted));var cpuReadout=Columns(-1,48);Add(cpuReadout,cpuValue,0);Add(cpuReadout,cpuGauge,1);cpu.Children.Add(cpuReadout);cpu.Children.Add(Text($"{Environment.ProcessorCount} logical cores",11,Muted));cpuGraph=new Sparkline("#6AF5E2"){Height=44,Margin=new Thickness(0,9,0,0)};cpu.Children.Add(cpuGraph);
@@ -234,7 +250,9 @@ public sealed class Widget : Window
     void BuildMetricBody()
     {
         metricHeader=Columns(-1,0);metricHeader.ColumnDefinitions[1].Width=GridLength.Auto;
-        var brand=Brand(true);Add(metricHeader,brand,0);
+        var headerInfo=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
+        compactBrand=Brand(true);headerInfo.Children.Add(compactBrand);compactTimes.Margin=new Thickness(8,0,0,0);compactTimes.VerticalAlignment=VerticalAlignment.Center;
+        compactTimes.TextWrapping=TextWrapping.NoWrap;compactTimes.Cursor=Cursors.Hand;compactTimes.MouseLeftButtonUp+=(_,_)=>ShowClocks();headerInfo.Children.Add(compactTimes);Add(metricHeader,headerInfo,0);
         metricHeader.MouseLeftButtonDown+=(_,e)=>{if(e.OriginalSource==metricHeader)DragMove();};
         var actions=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right};
         actions.Children.Add(RefreshButton(true));
@@ -266,6 +284,10 @@ public sealed class Widget : Window
         try{
             double width=ActualWidth>0?ActualWidth:Width,height=ActualHeight>0?ActualHeight:Height;
             MinHeight=width>=1002?120:width>=522?165:220;
+            worldClockRow.Visibility=clockPreferences.Enabled?Visibility.Visible:Visibility.Collapsed;
+            compactTimes.Visibility=clockPreferences.Enabled?Visibility.Visible:Visibility.Collapsed;
+            narrowClocks=width<650;compactBrand.Visibility=clockPreferences.Enabled&&narrowClocks?Visibility.Collapsed:Visibility.Visible;
+            UpdateClocks();
             metricPin.Content=Topmost?"◆":"◇";
             metricsOnly=compact||height<640;
             expandedBody.Visibility=metricsOnly?Visibility.Collapsed:Visibility.Visible;
@@ -288,6 +310,8 @@ public sealed class Widget : Window
                 tagline.Visibility=tight?Visibility.Collapsed:Visibility.Visible;
                 hint.Visibility=tight?Visibility.Collapsed:Visibility.Visible;
                 networkNote.Visibility=tight?Visibility.Collapsed:Visibility.Visible;
+                firstClock.Padding=secondClock.Padding=new Thickness(tight?8:10,tight?5:7,tight?8:10,tight?5:7);
+                firstTime.FontSize=secondTime.FontSize=tight?17:19;worldClockRow.Margin=new Thickness(0,0,0,tight?8:12);
                 greeting.Margin=new Thickness(0,tight?10:25,0,tight?10:19);
                 systems.Margin=new Thickness(0,dense?8:0,0,0);
                 cpuValue.FontSize=ramValue.FontSize=dense?26:tight?32:38;
@@ -322,7 +346,7 @@ public sealed class Widget : Window
     void SavePosition(){try{File.WriteAllText(System.IO.Path.Combine(Data,"window.json"),JsonSerializer.Serialize(new{left=Left,top=Top,topmost=Topmost,width=Width,height=Height,expandedHeight=metricsOnly?expandedHeight:Height,compact}));}catch{}}
     void UpdateSystem()
     {
-        clock.Text=DateTime.Now.ToString("HH:mm");
+        UpdateClocks();
         try {
             if(Native.GetSystemTimes(out var idle,out var kernel,out var user)) {
                 if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";cpuGauge.Set(usage);Plot(cpuHistory,cpuGraph,usage);}
@@ -355,11 +379,51 @@ public sealed class Widget : Window
         }catch(Exception){if(!closed){foreach(var card in cards.Values)card.MarkOffline();footer.Text="Could not refresh · retrying in 60s";}StopCollector();}
         finally{collector?.Dispose();collector=null;busy=false;if(!closed){foreach(var button in refreshButtons)button.IsEnabled=true;AdaptLayout();}}
     }
+    void UpdateClocks()
+    {
+        var now=DateTimeOffset.UtcNow;clock.Text=TimeZoneInfo.ConvertTime(now,TimeZoneInfo.Local).ToString("HH:mm");
+        if(!clockPreferences.Enabled)return;
+        var first=WorldClocks.At(now,clockPreferences.FirstZone);var second=WorldClocks.At(now,clockPreferences.SecondZone);
+        firstZoneLabel.Text=clockPreferences.FirstLabel;secondZoneLabel.Text=clockPreferences.SecondLabel;
+        firstTime.Text=first.ToString("HH:mm");secondTime.Text=second.ToString("HH:mm");
+        firstClock.ToolTip=WorldClocks.Description(now,clockPreferences.FirstZone,clockPreferences.FirstLabel);
+        secondClock.ToolTip=WorldClocks.Description(now,clockPreferences.SecondZone,clockPreferences.SecondLabel);
+        string Short(string label)=>label.Length>12?label[..11]+"…":label;
+        compactTimes.Text=narrowClocks?$"{first:HH:mm}  ·  {second:HH:mm}":$"{Short(clockPreferences.FirstLabel)} {first:HH:mm}  ·  {Short(clockPreferences.SecondLabel)} {second:HH:mm}";
+        compactTimes.ToolTip=$"{firstClock.ToolTip}\n\n{secondClock.ToolTip}\nClick to change clocks";
+        System.Windows.Automation.AutomationProperties.SetName(firstClock,firstClock.ToolTip.ToString());
+        System.Windows.Automation.AutomationProperties.SetName(secondClock,secondClock.ToolTip.ToString());
+    }
+    void ShowClocks()
+    {
+        var dialog=new Window{Title="Prism · World clocks",Width=490,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+        stack.Children.Add(Text("Two places. One glance.",23));
+        var info=Text("Add two clocks alongside your local time. Daylight saving is handled by Windows. Hover a clock for its date and UTC offset.",12,Muted);info.Margin=new Thickness(0,10,0,16);stack.Children.Add(info);
+        var enabled=new CheckBox{Content="Show two additional timezone clocks",IsChecked=clockPreferences.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,8)};stack.Children.Add(enabled);
+        var zones=TimeZoneInfo.GetSystemTimeZones();
+        (ComboBox zone,TextBox label) Choice(string title,string id,string name){
+            var label=Input(stack,title+" label",name);label.MaxLength=24;
+            var combo=new ComboBox{ItemsSource=zones,DisplayMemberPath="DisplayName",SelectedValuePath="Id",SelectedValue=id,IsTextSearchEnabled=true,MaxDropDownHeight=260,Margin=new Thickness(0,8,0,4),Padding=new Thickness(6),Foreground=Brush("#172438"),Background=Brush("#EDF4FC")};
+            combo.SelectionChanged+=(_,_)=>{if(combo.SelectedItem is TimeZoneInfo zone)label.Text=WorldClocks.Label(null,zone.Id);};
+            stack.Children.Add(combo);return(combo,label);
+        }
+        var first=Choice("First clock",clockPreferences.FirstZone,clockPreferences.FirstLabel);var second=Choice("Second clock",clockPreferences.SecondZone,clockPreferences.SecondLabel);
+        var note=Text("",11,Muted);note.Margin=new Thickness(0,12,0,12);stack.Children.Add(note);
+        var save=Button("Save clocks","Save timezone and display preferences",()=>{
+            if(first.zone.SelectedItem is not TimeZoneInfo a||second.zone.SelectedItem is not TimeZoneInfo b){note.Text="Choose both timezones.";return;}
+            if(enabled.IsChecked==true&&a.Id==b.Id){note.Text="Choose two different timezones.";return;}
+            var next=new ClockPreferences(enabled.IsChecked==true,a.Id,b.Id,WorldClocks.Label(first.label.Text,a.Id),WorldClocks.Label(second.label.Text,b.Id));
+            try{next.Save(System.IO.Path.Combine(Data,"clocks.json"));clockPreferences=next;AdaptLayout();dialog.Close();}
+            catch(Exception e) when(e is IOException or UnauthorizedAccessException){note.Text="Could not save the clock preferences. Check folder access.";}
+        });stack.Children.Add(save);dialog.ShowDialog();
+    }
     void ShowConnection(string key,string name)
     {
         var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
+        var clockSetup=Button("World clocks…","Show or configure two additional timezone clocks",()=>{dialog.Close();ShowClocks();});clockSetup.Margin=new Thickness(0,12,0,0);stack.Children.Add(clockSetup);
         if(providers.ValueKind==JsonValueKind.Object&&providers.TryGetProperty(key,out var selected)){
             var current=new StackPanel();current.Children.Add(Text(name,16));
             current.Children.Add(Text(selected.TryGetProperty("detail",out var explanation)?explanation.GetString()??"":selected.TryGetProperty("status",out var state)?state.GetString()??"":"Waiting",12,Muted));
@@ -450,6 +514,13 @@ public sealed class Widget : Window
         bool initial=Topmost;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));bool pinOk=Topmost!=initial;pin.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent));
         bool initialCompact=compact;double initialHeight=Height;compact=false;Height=Math.Min(MaxHeight,800);AdaptLayout();ToggleCompact();UpdateLayout();AdaptLayout();bool compactOk=metricsOnly;ToggleCompact();UpdateLayout();AdaptLayout();compactOk&=!metricsOnly;compact=initialCompact;Height=initialHeight;AdaptLayout();
         bool quotaValidation=RunQuotaChecks();
+        bool clocks=WorldClocks.Verify();
+        var clockTestPath=System.IO.Path.Combine(Root,"build","test-tmp","clocks-"+Guid.NewGuid().ToString("N")+".json");
+        try{
+            var testPreferences=new ClockPreferences(true,"Eastern Standard Time","Pacific Standard Time","Eastern","Pacific");
+            testPreferences.Save(clockTestPath);clocks&=ClockPreferences.Load(clockTestPath)==testPreferences;
+            File.WriteAllText(clockTestPath,"{malformed");clocks&=ClockPreferences.Load(clockTestPath)==new ClockPreferences();
+        }finally{if(File.Exists(clockTestPath))File.Delete(clockTestPath);}
         bool sensors=cpuValue.Text!="—"&&ramValue.Text!="—"&&diskValue.Text!="—";
         double oldWidth=Width,oldHeight=Height,oldLeft=Left,oldTop=Top,oldExpandedHeight=expandedHeight;bool oldCompact=compact;compact=false;
         bool presets=true;
@@ -458,19 +529,24 @@ public sealed class Widget : Window
             presets&=Math.Abs(ActualWidth-Math.Min(preset.Item1,MaxWidth))<1&&Math.Abs(ActualHeight-Math.Clamp(preset.Item2,MinHeight,MaxHeight))<1;
             presets&=metricsOnly==(preset.Item2<640);
         }
-        var layouts=new List<object>();bool fits=true;
+        var layouts=new List<object>();bool fits=true;var oldClocks=clockPreferences;
+        foreach(bool showClocks in new[]{false,true}){
+        clockPreferences=oldClocks with{Enabled=showClocks};
         foreach(var size in new[]{(340d,220d),(400d,430d),(560d,165d),(442d,600d),(442d,858d),(840d,260d),(840d,800d),(1200d,120d)}){
             Width=size.Item1;Height=size.Item2;UpdateLayout();AdaptLayout();UpdateLayout();
             var bounds=body.TransformToAncestor(this).TransformBounds(new Rect(0,0,body.ActualWidth,body.ActualHeight));
             var all=metricsOnly?metricTiles.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{metricHeader}):cards.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{cpuPanel,ramPanel,extras,utilities,section,bottom});
+            if(showClocks)all=all.Concat(metricsOnly?new FrameworkElement[]{compactTimes}:new FrameworkElement[]{worldClockRow,firstTime,secondTime});
             bool visible=all.All(el=>{var box=el.TransformToAncestor(this).TransformBounds(new Rect(0,0,el.ActualWidth,el.ActualHeight));return el.IsVisible&&box.Left>=10&&box.Top>=10&&box.Right<=ActualWidth-9&&box.Bottom<=ActualHeight-9;});
             bool fit=visible&&bounds.Bottom<=ActualHeight-10&&bounds.Right<=ActualWidth-10;fits&=fit;
-            layouts.Add(new{width=ActualWidth,height=ActualHeight,density,metricsOnly,columns=metricsOnly?metricGrid.Columns:providerGrid.Columns,scale=Math.Round(bounds.Width/body.ActualWidth,3),allReadingsVisible=visible,fits=fit});
-            SavePreview($"preview-{(int)size.Item1}x{(int)size.Item2}.png");
-            if(size.Item1==442&&size.Item2==858)SavePreview("preview-hd.png",4);
+            layouts.Add(new{clocksEnabled=showClocks,width=ActualWidth,height=ActualHeight,density,metricsOnly,columns=metricsOnly?metricGrid.Columns:providerGrid.Columns,scale=Math.Round(bounds.Width/body.ActualWidth,3),allReadingsVisible=visible,fits=fit});
+            if(showClocks)SavePreview($"preview-{(int)size.Item1}x{(int)size.Item2}.png");
+            if(showClocks&&size.Item1==442&&size.Item2==858)SavePreview("preview-hd.png",4);
         }
+        }
+        clockPreferences=oldClocks;
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     static bool RunQuotaChecks()
     {

@@ -1,6 +1,6 @@
 # Pre-publication review
 
-Reviewed on 2026-10-02 for the 1.4.1 vivid glass and vector-text export update.
+Reviewed on 2026-10-02 for the 1.5 optional world-clocks update.
 
 ## Findings resolved
 
@@ -23,9 +23,10 @@ Reviewed on 2026-10-02 for the 1.4.1 vivid glass and vector-text export update.
 
 - 42 mocked unit/regression tests passed.
 - Documented .NET 8 Release build completed with zero warnings or errors.
+- Clock checks passed for Eastern/Pacific winter and summer offsets, the spring DST transition, half-hour offsets, date rollover, invalid zones, preference round-trip and malformed preferences.
 - Native checks passed for sensors, pinning, compact mode and eight layout sizes, including the 1200 × 120 strip. The verification script confirmed fresh results and a successful process exit, quota edge cases, and all three layout presets. A duplicate-launch smoke test confirmed only one widget instance remains.
 - High-resolution header artwork and the multi-resolution application icon compiled and rendered. Ring gauges, rounded meters, reset countdowns, source states, and compact/expanded layouts were visually inspected.
-- All eight reference layouts now render at content scale 1. Native checks ran on the current 125% desktop. A 1770 x 3434 vector-text preview was generated and visually inspected; physical movement between monitors with different scaling was not tested.
+- All eight reference layouts render at content scale 1 with clocks both enabled and disabled (16 cases). Native checks ran on the current 125% desktop. A 1770 x 3434 vector-text preview was generated and visually inspected; physical movement between monitors with different scaling was not tested.
 - Staged-file publication checks found no private/runtime files, personal paths or credential patterns.
 - Gitleaks 8.30.1 found no secrets after identifying the extension's public RSA key. Its exception requires the exact public value AND exact manifest path. RSA SubjectPublicKeyInfo validation confirmed the key is public. The generic-api-key rule still detected a different synthetic key placed at that same path.
 
