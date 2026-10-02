@@ -439,13 +439,11 @@ public sealed class Widget : Window
     }
     void SavePreview(string name="preview.png",double scale=1)
     {
-        var originalDpi=VisualTreeHelper.GetDpi(this);
-        try{
-            // Reformat glyphs at the target DPI, rather than enlarging a screen-DPI text cache.
-            VisualTreeHelper.SetRootDpi(this,new DpiScale(scale,scale));InvalidateMeasure();UpdateLayout();
-            var bitmap=new RenderTargetBitmap((int)Math.Ceiling(ActualWidth*scale),(int)Math.Ceiling(ActualHeight*scale),96*scale,96*scale,PixelFormats.Pbgra32);bitmap.Render(this);
-            var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(System.IO.Path.Combine(Root,name));encoder.Save(file);
-        }finally{VisualTreeHelper.SetRootDpi(this,originalDpi);InvalidateMeasure();UpdateLayout();}
+        UpdateLayout();
+        var bitmap=new RenderTargetBitmap((int)Math.Ceiling(ActualWidth*scale),(int)Math.Ceiling(ActualHeight*scale),96*scale,96*scale,PixelFormats.Pbgra32);
+        // The HD path renders font outlines instead of magnifying screen-DPI glyph caches.
+        bitmap.Render(scale>1?VectorSnapshot.Capture(this):this);
+        var encoder=new PngBitmapEncoder();encoder.Frames.Add(BitmapFrame.Create(bitmap));using var file=File.Create(System.IO.Path.Combine(Root,name));encoder.Save(file);
     }
     void RunSelfTest()
     {
@@ -469,7 +467,7 @@ public sealed class Widget : Window
             bool fit=visible&&bounds.Bottom<=ActualHeight-10&&bounds.Right<=ActualWidth-10;fits&=fit;
             layouts.Add(new{width=ActualWidth,height=ActualHeight,density,metricsOnly,columns=metricsOnly?metricGrid.Columns:providerGrid.Columns,scale=Math.Round(bounds.Width/body.ActualWidth,3),allReadingsVisible=visible,fits=fit});
             SavePreview($"preview-{(int)size.Item1}x{(int)size.Item2}.png");
-            if(size.Item1==442&&size.Item2==858)SavePreview("preview-hd.png",3);
+            if(size.Item1==442&&size.Item2==858)SavePreview("preview-hd.png",4);
         }
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
         File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));

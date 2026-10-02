@@ -1,6 +1,6 @@
 # Pre-publication review
 
-Reviewed on 2026-10-02 for the 1.4 high-definition rendering update.
+Reviewed on 2026-10-02 for the 1.4.1 vivid glass and vector-text export update.
 
 ## Findings resolved
 
@@ -17,7 +17,7 @@ Reviewed on 2026-10-02 for the 1.4 high-definition rendering update.
 | P2 | source/QuotaSnapshot.cs | Validate UI quota inputs independently: keep known zero, reject invalid percentages and timestamps, filter expired windows, and fail closed for malformed mixed windows. The footer counts current sources only. |
 | P2 | source/App.cs, window state | Remember the expanded height across compact launches and restore that height instead of a fixed minimum of 700 pixels. |
 
-| Rendering | source/App.cs, app.manifest | Isolate the shadow behind content, declare PerMonitorV2 awareness, keep text opaque, and tighten compact spacing to avoid fractional downscaling. Add a 3x target-DPI preview. |
+| Rendering | source/App.cs, app.manifest | Isolate the shadow behind content, declare PerMonitorV2 awareness, keep text opaque, and tighten compact spacing to avoid fractional downscaling. Export a 4x preview with font outlines; screen-DPI glyph caches had remained visibly pixelated in earlier exports. |
 
 ## Local validation
 
@@ -25,7 +25,7 @@ Reviewed on 2026-10-02 for the 1.4 high-definition rendering update.
 - Documented .NET 8 Release build completed with zero warnings or errors.
 - Native checks passed for sensors, pinning, compact mode and eight layout sizes, including the 1200 × 120 strip. The verification script confirmed fresh results and a successful process exit, quota edge cases, and all three layout presets. A duplicate-launch smoke test confirmed only one widget instance remains.
 - High-resolution header artwork and the multi-resolution application icon compiled and rendered. Ring gauges, rounded meters, reset countdowns, source states, and compact/expanded layouts were visually inspected.
-- All eight reference layouts now render at content scale 1. Native checks ran on the current 125% desktop. A 3x preview was generated and visually inspected; physical movement between monitors with different scaling was not tested.
+- All eight reference layouts now render at content scale 1. Native checks ran on the current 125% desktop. A 1770 x 3434 vector-text preview was generated and visually inspected; physical movement between monitors with different scaling was not tested.
 - Staged-file publication checks found no private/runtime files, personal paths or credential patterns.
 - Gitleaks 8.30.1 found no secrets after identifying the extension's public RSA key. Its exception requires the exact public value AND exact manifest path. RSA SubjectPublicKeyInfo validation confirmed the key is public. The generic-api-key rule still detected a different synthetic key placed at that same path.
 
