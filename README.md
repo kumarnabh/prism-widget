@@ -56,6 +56,8 @@ System readings update every two seconds. Provider collection runs each minute; 
 
 Drag the title to move and the lower-right grip to resize. The top toolbar's vertical-arrow icon fits height to content; double-clicking the grip does the same. The icon is available in full and compact layouts. The **⋯** menu remains accessible at every size. Short layouts combine metrics into two, four or eight columns. Hover for labels and details.
 
+Free RAM, Refresh and Settings share one action row. Below 430 pixels wide or 760 pixels tall, labels collapse into icons with tooltips and accessible names. In compact mode, these actions share the header with Fit height and More. Use More or Ctrl+M to restore details; More or Esc closes Prism. Charts appear only when the entire grid fits without shrinking the dashboard.
+
 | Shortcut | Action |
 | --- | --- |
 | F5 | Refresh |
@@ -90,7 +92,7 @@ node --test tests/popup.test.cjs
 ./Prism.exe
 ```
 
-Close Prism before rebuilding. `Build.ps1 -SkipDependencies` skips setup. Native checks use **offline account fixtures** by default, plus real system sensors. They cover controls, quota rules, reminders, clocks, 16 layouts and 4× export dimensions. `-LiveAccounts` deliberately reads your accounts and can put private quota into local screenshots. CI tests Python 3.11 and 3.14, WPF, browser behavior and Git history. Physical mixed-DPI transitions and every provider plan are not covered.
+Close Prism before rebuilding. `Build.ps1 -SkipDependencies` skips setup. Native checks use **offline account fixtures** by default, plus real system sensors. They cover controls, quota rules, reminders, clocks, 16 reference layouts, 480 forward/reverse resize checks and 4× export dimensions. `-LiveAccounts` deliberately reads your accounts and can put private quota into local screenshots. CI tests Python 3.11 and 3.14, WPF, browser behavior and Git history. Physical mixed-DPI transitions and every provider plan are not covered.
 
 See [architecture](docs/ARCHITECTURE.md), [releasing](docs/RELEASING.md), [change log](CHANGELOG.md), and [review notes](AUDIT.md). Packages use an explicit file list instead of copying a personal installation.
 

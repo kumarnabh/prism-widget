@@ -21,6 +21,10 @@ if($result.layouts.Count -ne 16){throw 'Expected eight layouts with clocks both 
 foreach($layout in $result.layouts){
     if($layout.fits -ne $true -or $layout.allReadingsVisible -ne $true -or $layout.scale -lt 0.999){throw "Layout failed: $($layout.width) x $($layout.height)"}
 }
+if($result.transitions.Count -ne 480){throw 'Expected 480 forward/reverse resize checks with clocks on and off.'}
+foreach($layout in $result.transitions){
+    if($layout.fits -ne $true -or $layout.controls -ne $true -or $layout.scale -lt 0.999){throw "Resize transition failed: $($layout.width) x $($layout.height), clocks=$($layout.clocksEnabled), controls=$($layout.controls), scale=$($layout.scale)"}
+}
 $hdPath=Join-Path $prismRoot 'preview-hd.png'
 if(-not (Test-Path -LiteralPath $hdPath) -or (Get-Item -LiteralPath $hdPath).LastWriteTimeUtc -lt $started){throw 'HD preview missing or stale.'}
 $png=[IO.File]::ReadAllBytes($hdPath)
@@ -29,4 +33,4 @@ function Read-PngDimension([int]$offset){return [long]$png[$offset]*16777216+[lo
 $hdWidth=Read-PngDimension 16
 $hdHeight=Read-PngDimension 20
 if($result.hdLogicalWidth -le 0 -or $result.hdLogicalHeight -le 0 -or $hdWidth -ne [Math]::Ceiling($result.hdLogicalWidth*4) -or $hdHeight -ne [Math]::Ceiling($result.hdLogicalHeight*4)){throw 'HD preview does not match the 4x logical layout resolution.'}
-Write-Host "Native checks passed: fresh results, sensors, controls, 16 layouts with clocks on/off, and $hdWidth x $hdHeight HD export."
+Write-Host "Native checks passed: sensors, controls, 16 layouts, 480 resize transitions, and $hdWidth x $hdHeight HD export."

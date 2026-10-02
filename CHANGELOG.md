@@ -1,5 +1,12 @@
 # Change log
 
+## 1.7.2 — Adaptive action row
+
+- Consolidated Free RAM, Refresh and Settings into one row; labels collapse to accessible vector icons in narrower/shorter layouts.
+- Compact mode keeps the same actions in its header without adding a row. Restore/close remain in the More menu and keyboard shortcuts.
+- Fixed narrow layouts shrinking the entire widget when charts appeared without enough vertical room. Charts now require enough space for the whole grid.
+- Added 480 forward/reverse breakpoint checks, including long clock labels, action visibility, non-overlap and label restoration.
+
 ## 1.7.1 — Toolbar fit control
 
 - Moved Fit height to a crisp vector icon in the top toolbar in both full and compact layouts, with an accessible name and hover description.

@@ -1,5 +1,11 @@
 # Pre-publication review
 
+## 1.7.2 adaptive controls — 2026-10-02
+
+Free RAM, Refresh and Settings now share one responsive action row. Compact layouts use accessible vector icons in the header. A breakpoint check exposed chart activation shrinking narrow grids: WPF deferred a parent measurement after visibility changed. Chart visibility now invalidates its container immediately, and charts are suppressed when the complete grid exceeds available height.
+
+Local Release build: zero warnings/errors. Native verification passed all 16 reference layouts plus 480 forward/reverse resize cases around width/height breakpoints, with clocks off/on and long labels. Checks cover visible actions, sibling overlap, label-mode restoration and full content scale. Full/compact renders were inspected. Hosted validation is recorded separately in GitHub Actions.
+
 ## 1.7 public-release review — 2026-10-02
 
 Resolved active-account Codex telemetry precedence, first/removed Claude browser account selection, clipped reminder settings on short displays, and display-size assumptions in native checks. Added isolated dependency setup, privacy-safe diagnostics, offline native testing, public documentation, MIT licensing, CI and explicit-list self-contained packaging. Debug symbols are excluded from the public archive.
