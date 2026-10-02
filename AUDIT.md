@@ -1,6 +1,6 @@
 # Pre-publication review
 
-Reviewed on 2026-10-02 for the 1.5 optional world-clocks update.
+Reviewed on 2026-10-02 for the 1.6 reset-reminder update.
 
 ## Findings resolved
 
@@ -19,10 +19,13 @@ Reviewed on 2026-10-02 for the 1.5 optional world-clocks update.
 
 | Rendering | source/App.cs, app.manifest | Isolate the shadow behind content, declare PerMonitorV2 awareness, keep text opaque, and tighten compact spacing to avoid fractional downscaling. Export a 4x preview with font outlines; screen-DPI glyph caches had remained visibly pixelated in earlier exports. |
 
+| Reminders | source/ResetReminders.cs | Require remaining capacity strictly above 10%, a future reset inside the chosen interval, and current data no older than ten minutes. Deduplicate by provider/window/reset and persist locally. |
+
 ## Local validation
 
 - 42 mocked unit/regression tests passed.
 - Documented .NET 8 Release build completed with zero warnings or errors.
+- Reset-reminder checks passed for threshold/time boundaries, stale/future/unknown readings, invalid percentages, disabled mode, restart deduplication, a new reset cycle, corrupted state, and popup opening/dismissal. The labeled sample popup was visually inspected. A real upcoming account reset was not used for validation.
 - Clock checks passed for Eastern/Pacific winter and summer offsets, the spring DST transition, half-hour offsets, date rollover, invalid zones, preference round-trip and malformed preferences.
 - Native checks passed for sensors, pinning, compact mode and eight layout sizes, including the 1200 × 120 strip. The verification script confirmed fresh results and a successful process exit, quota edge cases, and all three layout presets. A duplicate-launch smoke test confirmed only one widget instance remains.
 - High-resolution header artwork and the multi-resolution application icon compiled and rendered. Ring gauges, rounded meters, reset countdowns, source states, and compact/expanded layouts were visually inspected.

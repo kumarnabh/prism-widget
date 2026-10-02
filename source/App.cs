@@ -50,6 +50,10 @@ public sealed class Widget : Window
     readonly Dictionary<string,MetricTile> metricTiles=new();
     Grid metricHeader=null!;
     bool metricsOnly;
+    ResetReminders resetReminders=ResetReminders.Load(System.IO.Path.Combine(Data,"reset-reminders.json"));
+    readonly Dictionary<string,QuotaSnapshot> latestReadings=new();
+    readonly Popup reminderPopup=new(){AllowsTransparency=true,StaysOpen=true,Placement=PlacementMode.Bottom,PopupAnimation=PopupAnimation.Fade};
+    readonly DispatcherTimer reminderTimer=new(){Interval=TimeSpan.FromSeconds(12)};
     ClockPreferences clockPreferences=ClockPreferences.Load(System.IO.Path.Combine(Data,"clocks.json"));
     readonly TextBlock firstTime=Text("—",19),secondTime=Text("—",19),firstZoneLabel=Text("",10,Muted),secondZoneLabel=Text("",10,Muted),compactTimes=Text("",12);
     Grid worldClockRow=null!;
@@ -112,6 +116,7 @@ public sealed class Widget : Window
         MaxHeight=SystemParameters.WorkArea.Height-24;
         Build();
         LoadPosition();
+        reminderPopup.PlacementTarget=frame;reminderTimer.Tick+=(_,_)=>DismissReminder();
         SizeChanged+=(_,_)=>AdaptLayout();
         systemTimer.Tick+=(_,_)=>UpdateSystem(); providerTimer.Tick+=async (_,_)=>await UpdateProviders();
         Loaded+=async (_,_)=>{
@@ -122,7 +127,7 @@ public sealed class Widget : Window
                 SavePreview(); Close();
             }
         };
-        Closed+=(_,_)=>{closed=true; systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
+        Closed+=(_,_)=>{closed=true;DismissReminder(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
         KeyDown+=async (_,e)=>{
             if(e.Key==Key.F5){await UpdateProviders();e.Handled=true;}
             else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.P){SetPinned(!Topmost);e.Handled=true;}
@@ -174,7 +179,7 @@ public sealed class Widget : Window
             Item("Focus · 560 × 220","",()=>ApplyPreset(560,220));
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
             menu.Items.Add(new Separator());Item("Free RAM…","",ShowMemory);Item("Connections…","Ctrl+,",()=>ShowConnection("cursor","Cursor"));
-            Item("World clocks…","",ShowClocks);
+            Item("World clocks…","",ShowClocks);Item("Reset reminders…","",ShowResetReminders);
             menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
             menu.PlacementTarget=button;menu.Placement=PlacementMode.Bottom;menu.IsOpen=true;
         };return button;
@@ -346,7 +351,7 @@ public sealed class Widget : Window
     void SavePosition(){try{File.WriteAllText(System.IO.Path.Combine(Data,"window.json"),JsonSerializer.Serialize(new{left=Left,top=Top,topmost=Topmost,width=Width,height=Height,expandedHeight=metricsOnly?expandedHeight:Height,compact}));}catch{}}
     void UpdateSystem()
     {
-        UpdateClocks();
+        UpdateClocks();CheckResetReminders();
         try {
             if(Native.GetSystemTimes(out var idle,out var kernel,out var user)) {
                 if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";cpuGauge.Set(usage);Plot(cpuHistory,cpuGraph,usage);}
@@ -374,10 +379,56 @@ public sealed class Widget : Window
             if(closed)return;
             var output=await stdout;await stderr;if(collector.ExitCode!=0)throw new Exception("Collector unavailable. Check Python installation.");
             using var doc=JsonDocument.Parse(output);providers=doc.RootElement.Clone();
-            foreach(var (key,card) in cards){try{if(providers.TryGetProperty(key,out var data))card.Update(data);else card.MarkOffline();}catch{card.MarkOffline();}}
+            latestReadings.Clear();
+            foreach(var (key,card) in cards){try{if(providers.TryGetProperty(key,out var data)){card.Update(data);latestReadings[ProviderName(key)]=QuotaSnapshot.Read(data,DateTimeOffset.UtcNow);}else card.MarkOffline();}catch{card.MarkOffline();}}
+            CheckResetReminders();
             footer.Text=$"{cards.Values.Count(c=>c.Health=="ready")} of 4 sources current  ·  {DateTime.Now:HH:mm}";
-        }catch(Exception){if(!closed){foreach(var card in cards.Values)card.MarkOffline();footer.Text="Could not refresh · retrying in 60s";}StopCollector();}
+        }catch(Exception){latestReadings.Clear();if(!closed){foreach(var card in cards.Values)card.MarkOffline();footer.Text="Could not refresh · retrying in 60s";}StopCollector();}
         finally{collector?.Dispose();collector=null;busy=false;if(!closed){foreach(var button in refreshButtons)button.IsEnabled=true;AdaptLayout();}}
+    }
+    static string ProviderName(string key)=>key switch{"codex"=>"Codex","cursor"=>"Cursor","claude"=>"Claude",_=>"OpenCode Go"};
+    void CheckResetReminders()
+    {
+        if(preview||selftest||closed||!IsVisible||WindowState==WindowState.Minimized||!resetReminders.Enabled||reminderPopup.IsOpen)return;
+        var now=DateTimeOffset.UtcNow;var notices=resetReminders.Unseen(ResetReminders.Due(latestReadings,now,resetReminders.LeadMinutes));
+        if(notices.Count==0)return;
+        ShowReminder(notices.Select(n=>n.Message(now)).ToArray(),false);
+        resetReminders.Mark(notices,now);
+        try{resetReminders.Save(System.IO.Path.Combine(Data,"reset-reminders.json"));}catch(Exception e) when(e is IOException or UnauthorizedAccessException){}
+    }
+    void DismissReminder(){reminderTimer.Stop();reminderPopup.IsOpen=false;}
+    Border ReminderContent(IReadOnlyList<string> messages,bool isPreview)
+    {
+        var content=new StackPanel();var header=Columns(-1,30);
+        var title=Text(isPreview?"Preview · Quota resets soon":"Quota resets soon",14);title.Foreground=Brush("#FFE0A1");title.FontWeight=FontWeights.SemiBold;title.VerticalAlignment=VerticalAlignment.Center;Add(header,title,0);
+        var dismiss=Button("×","Dismiss reset reminder",DismissReminder);dismiss.Padding=new Thickness(5,2,5,2);Add(header,dismiss,1);content.Children.Add(header);
+        foreach(string message in messages.Take(3)){var line=Text(message,12);line.Margin=new Thickness(0,8,0,0);content.Children.Add(line);}
+        if(messages.Count>3){var more=Text($"+ {messages.Count-3} more windows · hover for details",11,Muted);more.Margin=new Thickness(0,8,0,0);content.Children.Add(more);}
+        var panel=Panel(content,"#F02A344A",14);panel.Width=310;panel.Padding=new Thickness(14);panel.BorderBrush=Brush("#C2E8BD77");panel.ToolTip=string.Join("\n",messages);
+        System.Windows.Documents.TextElement.SetFontFamily(panel,FontFamily);
+        System.Windows.Automation.AutomationProperties.SetName(panel,(isPreview?"Preview. ":"")+"Quota resets soon. "+string.Join(". ",messages));
+        return panel;
+    }
+    void ShowReminder(IReadOnlyList<string> messages,bool isPreview)
+    {
+        DismissReminder();reminderPopup.Child=ReminderContent(messages,isPreview);reminderPopup.IsOpen=true;reminderTimer.Start();
+    }
+    void ShowResetReminders()
+    {
+        var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=stack;stack.Children.Add(Text("A nudge before the reset",23));
+        var info=Text("Show a quiet, 12-second reminder when a quota window is about to reset and more than 10% remains. Each window alerts once per reset, even across restarts.",12,Muted);info.Margin=new Thickness(0,12,0,18);stack.Children.Add(info);
+        var enabled=new CheckBox{Content="Enable reset reminders",IsChecked=resetReminders.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,12)};stack.Children.Add(enabled);
+        stack.Children.Add(Text("Remind me before reset",11,Muted));
+        var lead=new ComboBox{ItemsSource=ResetReminders.LeadOptions,SelectedItem=resetReminders.LeadMinutes,ItemStringFormat="{0} minutes",Padding=new Thickness(7),Margin=new Thickness(0,6,0,14),Foreground=Brush("#172438"),Background=Brush("#EDF4FC")};stack.Children.Add(lead);
+        stack.Children.Add(Text("Only current readings with a known reset time qualify. No sound, model calls or automatic token spending. Prism must be running and visible.",11,Muted));
+        var status=Text("",11,Muted);status.Margin=new Thickness(0,10,0,10);stack.Children.Add(status);
+        stack.Children.Add(Button("Preview reminder","Show a sample reminder without changing alert history",()=>ShowReminder(new[]{"Codex · 5-hour: resets in 20m · 42% left"},true)));
+        var save=Button("Save reminders","Save reminder preferences",()=>{
+            var next=new ResetReminders{Enabled=enabled.IsChecked==true,LeadMinutes=lead.SelectedItem is int minutes?minutes:30,Notified=resetReminders.Notified};
+            try{next.Save(System.IO.Path.Combine(Data,"reset-reminders.json"));resetReminders=next;DismissReminder();dialog.Close();CheckResetReminders();}
+            catch(Exception e) when(e is IOException or UnauthorizedAccessException){status.Text="Could not save reminders. Check folder access.";}
+        });save.Margin=new Thickness(4,8,0,0);stack.Children.Add(save);dialog.ShowDialog();
     }
     void UpdateClocks()
     {
@@ -424,6 +475,7 @@ public sealed class Widget : Window
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
         var clockSetup=Button("World clocks…","Show or configure two additional timezone clocks",()=>{dialog.Close();ShowClocks();});clockSetup.Margin=new Thickness(0,12,0,0);stack.Children.Add(clockSetup);
+        var reminderSetup=Button("Reset reminders…","Configure reminders for unused quota before reset",()=>{dialog.Close();ShowResetReminders();});reminderSetup.Margin=new Thickness(0,8,0,0);stack.Children.Add(reminderSetup);
         if(providers.ValueKind==JsonValueKind.Object&&providers.TryGetProperty(key,out var selected)){
             var current=new StackPanel();current.Children.Add(Text(name,16));
             current.Children.Add(Text(selected.TryGetProperty("detail",out var explanation)?explanation.GetString()??"":selected.TryGetProperty("status",out var state)?state.GetString()??"":"Waiting",12,Muted));
@@ -521,6 +573,17 @@ public sealed class Widget : Window
             testPreferences.Save(clockTestPath);clocks&=ClockPreferences.Load(clockTestPath)==testPreferences;
             File.WriteAllText(clockTestPath,"{malformed");clocks&=ClockPreferences.Load(clockTestPath)==new ClockPreferences();
         }finally{if(File.Exists(clockTestPath))File.Delete(clockTestPath);}
+        bool reminders;
+        var reminderTestPath=System.IO.Path.Combine(Root,"build","test-tmp","reminders-"+Guid.NewGuid().ToString("N")+".json");
+        try{reminders=ResetReminders.Verify(reminderTestPath);}finally{if(File.Exists(reminderTestPath))File.Delete(reminderTestPath);}
+        var reminderPreview=ReminderContent(new[]{"Codex · 5-hour: resets in 20m · 42% left"},true);
+        reminderPreview.Measure(new Size(310,double.PositiveInfinity));reminderPreview.Arrange(new Rect(reminderPreview.DesiredSize));reminderPreview.UpdateLayout();
+        var alertImage=new RenderTargetBitmap(620,(int)Math.Ceiling(reminderPreview.ActualHeight*2),192,192,PixelFormats.Pbgra32);alertImage.Render(VectorSnapshot.Capture(reminderPreview));
+        var alertEncoder=new PngBitmapEncoder();alertEncoder.Frames.Add(BitmapFrame.Create(alertImage));using(var alertFile=File.Create(System.IO.Path.Combine(Root,"preview-alert.png")))alertEncoder.Save(alertFile);
+        reminders&=reminderPreview.ActualWidth<=310&&reminderPreview.ActualHeight>0;
+        ShowReminder(new[]{"Codex · 5-hour: resets in 20m · 42% left"},true);
+        reminders&=reminderPopup.IsOpen&&reminderTimer.IsEnabled;DismissReminder();
+        reminders&=!reminderPopup.IsOpen&&!reminderTimer.IsEnabled;
         bool sensors=cpuValue.Text!="—"&&ramValue.Text!="—"&&diskValue.Text!="—";
         double oldWidth=Width,oldHeight=Height,oldLeft=Left,oldTop=Top,oldExpandedHeight=expandedHeight;bool oldCompact=compact;compact=false;
         bool presets=true;
@@ -546,7 +609,7 @@ public sealed class Widget : Window
         }
         clockPreferences=oldClocks;
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,sensors,responsive=fits,layouts,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     static bool RunQuotaChecks()
     {

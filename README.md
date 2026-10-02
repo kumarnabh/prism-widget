@@ -11,6 +11,7 @@ A glass-style Windows desktop widget for system metrics and AI subscription avai
 - Optional pinning and working-set trimming for selected apps.
 - CPU and RAM ring gauges, smooth history charts, rounded quota bars, and freshness indicators for every AI source.
 - Dashboard, Focus and Ribbon size presets, with remembered expanded height.
+- Quiet reset reminders when more than 10% of a quota window remains.
 - Two optional timezone clocks with saved labels, automatic daylight-saving conversion, and date/UTC-offset tooltips.
 - Single-instance startup and automatic recovery from malformed caches or unavailable quota sources.
 
@@ -44,6 +45,14 @@ The **⋯** menu keeps pinning, fit height, Free RAM and Connections accessible 
 Choose **⋯ → World clocks…** (also available in Settings). Enable the clocks, select two Windows timezones, and optionally edit their labels. Defaults are US Eastern and US Pacific; these follow daylight saving automatically, showing EDT/PDT during summer and EST/PST during winter. Your computer's local clock stays in the detailed view.
 
 Full view shows two labeled clock cards. Short layouts use the existing header so the clocks add no rows; hover to see both labels, dates and UTC offsets. Choices are saved locally in ignored `data/clocks.json`. Fresh checkouts leave the clocks off until enabled.
+
+## Reset reminders
+
+Enabled by default, with a **30-minute** warning window. Choose **⋯ → Reset reminders…** or **Settings → Reset reminders…** to disable them, choose 5/15/30/60/120 minutes, or preview the popup.
+
+A quiet popup appears for 12 seconds when a known quota reset is approaching and that window has **strictly more than 10% remaining**. Checks run while Prism is visible. Stale readings, readings older than ten minutes, expired windows and unknown reset times do not trigger alerts. Claude CLI readings currently lack parsed reset times, so they cannot trigger a reminder until a source supplies one.
+
+Each provider/window/reset combination alerts once; notification history survives restarts in ignored `data/reset-reminders.json`. Multiple due windows share one popup. No model calls or automatic token spending are performed.
 
 ## Privacy and publishing
 
