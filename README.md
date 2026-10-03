@@ -22,7 +22,8 @@
 - Copyable dependency diagnostics without account details, credentials or machine paths.
 - System tray monitoring, background notifications and optional per-user Windows startup.
 - Independent provider schedules, next-check countdowns and configurable low-quota alerts.
-- Local 24-hour, weekly and 30-day allowance history; no account identities or prompts stored.
+- Local window-level allowance history, cautious burn-rate estimates, safe pace and an upcoming-reset timeline.
+- A cached tray capacity view and optional predictive alerts; no model calls or cloud analytics.
 - Hide/reorder metrics, adjust opacity and save Work, Gaming, Presentation or custom layout profiles.
 - Screen-edge snapping and monitor-aware position restoration.
 - English, Hindi, Spanish and French core interface, with 12/24-hour clocks.
@@ -90,15 +91,19 @@ Open the **Settings** icon or **Ctrl+,**. The dashboard remains free of scrollin
 | General | Tray, optional Windows startup, edge snapping, 12/24-hour clock, language, opacity, connections and timezone settings |
 | Refresh rates | Separate provider intervals; caches and provider backoff remain authoritative |
 | Metrics | Check visible metrics, select a row and move it up/down; at least one metric must remain |
-| Alerts | Low-quota threshold, reset reminders and local history recording |
+| Alerts | Low-quota threshold, reset reminders, local history, capacity estimates and opt-in predictive alerts |
 | Profiles | Save/replace, load or delete up to 20 layouts; built-in Work/Gaming/Presentation starters |
 | Updates | Check GitHub, download a verified ZIP and open the downloads folder |
 
-**Tray:** use More → Hide to tray or minimize. Click the tray icon to restore; right-click for Show, Refresh, Settings, History and Exit. Closing the widget or pressing Esc exits Prism. Startup launches into the tray. Notifications depend on Windows settings and Prism remaining open.
+**Tray:** use More → Hide to tray or minimize. Click the tray icon for CPU/RAM, provider capacity/status and the nearest known current reset; choose Show Prism to restore. Right-click offers Show, Refresh, Settings, History, Capacity & resets and Exit. Opening the view uses cached readings and never starts account collection. Closing the widget or pressing Esc exits Prism. Startup launches into the tray. Notifications depend on Windows settings and Prism remaining open.
 
 **Low quota:** enabled at 20% by default; select a threshold from 5–50%. Each provider/window alerts once until it recovers above the threshold or starts a new reset cycle. Manual, stale, future or missing readings cannot trigger alerts. If no reset timestamp exists, recovery is needed to rearm that window.
 
-**History:** More → Usage history shows remaining allowance over 24 hours, 7 days or 30 days. It records fresh readings locally in five-minute buckets for up to 30 days, and draws gaps when samples are more than an hour apart. A quota reset can raise the line. It is allowance history, not a token-consumption or billing ledger. It groups by service within this installation, so changing an account continues the same service series. Disable recording in Alerts; use Clear history to erase saved points. Data is collected only while Prism runs and is not backfilled.
+**History:** More → Usage history shows 24 hours, 7 days or 30 days. Choose a quota window to see current-account samples, gaps, reset markers and an optional estimated trajectory. Fresh captures are compacted into five-minute buckets for up to 30 days. Old 1.8 history remains available as **Legacy aggregate**; it mixed accounts and windows, so it is never used for forecasts. New histories use installation-local opaque scopes, not account names. Token rotation may start a new series. Disable recording in Alerts; Clear history erases both formats. Data is collected only while Prism runs and is not backfilled.
+
+**Capacity:** More → Capacity & resets orders provider-reported reset times and shows remaining allowance, state and limiting windows. Tooltips and details add Prism-calculated recent pace, sustainable pace and estimated capacity at reset when sufficient valid history exists. Percentages per hour mean **percentage points of allowance**, not tokens. Estimates require at least six distinct samples over 30 minutes, a verified account scope and an unbroken quota cycle. Corrections, gaps, stale readings and rolling replenishment suppress projections. Unknown resets stay unknown. The measured percentage remains provider-reported; estimates do not replace it.
+
+Turn off **Show capacity estimates** to hide forecasting. **Predictive alerts are off by default**; enable them in Alerts for sustained estimates of exhaustion at least 15 minutes before reset. Two qualifying captures at least five minutes apart are required. All capacity/low/reset deliveries share a two-minute cooldown and persistent deduplication. Rapid-burn notifications are deferred until a dependable personal baseline can be established. See [forecast method and limitations](docs/FORECASTING.md).
 
 **Layouts:** profiles include size, compact mode, pinning, opacity, metric visibility/order and clocks. They exclude sign-ins, alert settings and refresh intervals. Compact mode follows the complete chosen order; the full dashboard keeps CPU/RAM and disk/network paired and orders its AI cards. Hidden metrics still collect and can alert. Drag near a work-area edge to snap; saved monitor offsets restore with an on-screen fallback when a monitor disappears.
 

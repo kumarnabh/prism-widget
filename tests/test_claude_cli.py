@@ -41,5 +41,12 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(c,'DATA',pathlib.Path(folder)),patch.object(c,'executable',return_value='claude.exe'),patch.object(c.subprocess,'run',return_value=SimpleNamespace(stdout='{"loggedIn":true,"authMethod":"claude.ai","email":"new@example.test"}')),patch.object(c,'read_panel',return_value={'status':'Unavailable','detail':'failed'}):
             (pathlib.Path(folder)/'claude-cli.json').write_text(json.dumps({'identity':'different','checked':time.time(),'reading':{'status':'CLI','at':time.time(),'windows':[{'remaining':90}]}}))
             self.assertNotIn('windows',c.collect())
+    def test_account_switch_during_panel_discards_scope_and_cache(self):
+        first=SimpleNamespace(stdout=json.dumps({'loggedIn':True,'authMethod':'claude.ai','email':'first@example.test'}))
+        second=SimpleNamespace(stdout=json.dumps({'loggedIn':True,'authMethod':'claude.ai','email':'second@example.test'}))
+        for after in (second,SimpleNamespace(stdout='{"loggedIn":false}'),SimpleNamespace(stdout='malformed')):
+            with self.subTest(after=after),tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(c,'DATA',pathlib.Path(folder)),patch.object(c,'executable',return_value='claude.exe'),patch.object(c.subprocess,'run',side_effect=[first,after]),patch.object(c,'read_panel',return_value={'status':'CLI','at':time.time(),'windows':[{'label':'Session','remaining':50,'reset':None}]}):
+                result=c.collect();self.assertNotIn('windows',result);self.assertNotIn('scope',result)
+                self.assertFalse((pathlib.Path(folder)/'claude-cli.json').exists())
 
 if __name__=='__main__': unittest.main()

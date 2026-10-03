@@ -28,7 +28,7 @@ public class App : Application
         if(!created){ActivateExisting(identity);return;}
         var app = new App();
         L.Set(diagnostic?"en":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).Language);
-        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true; };
+        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true;if(diagnostic)app.Shutdown(1); };
         app.Run(new Widget(args.Contains("--preview"), args.Contains("--selftest")||offline,offline,args.Contains("--tray")));
     }
     static void ActivateExisting(string identity)
@@ -131,11 +131,11 @@ public sealed partial class Widget : Window
             UpdateSystem(); systemTimer.Start(); providerTimer.Start(); await UpdateProviders(true);
             if(preview || selftest) {
                 await System.Threading.Tasks.Task.Delay(5000); UpdateSystem();
-                if(selftest){featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
+                if(selftest){forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
                 SavePreview(); Close();
             }
         };
-        Closed+=(_,_)=>{closed=true;DismissReminder();tray?.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
+        Closed+=(_,_)=>{closed=true;DismissReminder();trayView?.Close();tray?.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
         KeyDown+=async (_,e)=>{
             if(e.Key==Key.F5){await UpdateProviders(true);e.Handled=true;}
             else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.P){SetPinned(!Topmost);e.Handled=true;}
@@ -214,7 +214,7 @@ public sealed partial class Widget : Window
             Item("Focus · 560 × 220","",()=>ApplyPreset(560,220));
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
             menu.Items.Add(new Separator());Item("Free RAM","",ShowMemory);Item("Settings","Ctrl+,",ShowPreferences);Item("Connections…","",()=>ShowConnection("cursor","Cursor"));
-            Item("Usage history","",ShowHistory);if(tray is not null)Item("Hide to tray","",HideToTray);
+            Item("Capacity & resets","",ShowCapacity);Item("Usage history","",ShowHistory);if(tray is not null)Item("Hide to tray","",HideToTray);
             Item("World clocks…","",ShowClocks);Item("Reset reminders…","",ShowResetReminders);
             Item("Diagnostics…","",async()=>await ShowDiagnostics());
             menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
@@ -412,7 +412,7 @@ public sealed partial class Widget : Window
     void SavePosition(){try{var display=DesktopLayout.Current(this);LocalJson.Save(System.IO.Path.Combine(Data,"window.json"),new WindowPlacement(Left,Top,Topmost,Width,Height,metricsOnly?expandedHeight:Height,compact,display.Id,Left-display.Work.Left,Top-display.Work.Top));}catch(IOException){}catch(UnauthorizedAccessException){}}
     void UpdateSystem()
     {
-        UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();
+        UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
         try {
             if(Native.GetSystemTimes(out var idle,out var kernel,out var user)) {
                 if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";cpuGauge.Set(usage);Plot(cpuHistory,cpuGraph,usage);}
@@ -453,8 +453,8 @@ public sealed partial class Widget : Window
                 else providerData.Remove(key);
             }
             using(var merged=JsonDocument.Parse(JsonSerializer.Serialize(providerData)))providers=merged.RootElement.Clone();
-            if(changed)try{history.Save(System.IO.Path.Combine(Data,"usage-history.json"));}catch(IOException){}catch(UnauthorizedAccessException){}
-            RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();
+            if(changed)try{history.Save(HistoryPath);}catch(IOException){}catch(UnauthorizedAccessException){}
+            RefreshForecasts(true);RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
         }catch(Exception){if(!closed){foreach(var key in due){providerData.Remove(key);latestReadings.Remove(ProviderName(key));cards[key].MarkOffline();}footer.Text=L.T("Refresh failed; scheduled checks will retry.");}StopCollector();}
         finally{collector?.Dispose();collector=null;busy=false;if(!closed){foreach(var button in refreshButtons)button.IsEnabled=true;AdaptLayout();}}
     }
@@ -465,7 +465,7 @@ public sealed partial class Widget : Window
         var now=DateTimeOffset.UtcNow;var notices=resetReminders.Unseen(ResetReminders.Due(latestReadings,now,resetReminders.LeadMinutes));
         if(notices.Count==0)return;
         var messages=notices.Select(n=>n.Message(now)).ToArray();
-        if(!IsVisible||WindowState==WindowState.Minimized){if(tray?.Notify(L.T("Quota resets soon"),string.Join("\n",messages))!=true)return;}else ShowReminder(messages,false);
+        if(!DeliverNotice("Quota resets soon",messages))return;
         resetReminders.Mark(notices,now);
         try{resetReminders.Save(System.IO.Path.Combine(Data,"reset-reminders.json"));}catch(Exception e) when(e is IOException or UnauthorizedAccessException){}
     }
@@ -730,9 +730,9 @@ public sealed partial class Widget : Window
                 }
             }
         }
-        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;
+        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     (bool fits,bool controls,double scale) CheckLayout()
     {

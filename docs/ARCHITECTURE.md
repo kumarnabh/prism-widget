@@ -24,3 +24,11 @@ Git ignores runtime state. A staged checker rejects private paths/patterns, and 
 `Localization.cs` provides core resources for English/Hindi/Spanish/French and clock formats. Advanced provider messages remain their source language. `ReleaseUpdates.cs` accepts only the fixed repository's release metadata and bounded HTTPS downloads through allowlisted GitHub hosts, verifies exact size and SHA-256, and renames only validated temporary files. Body transfers have an operation deadline, not just a response-header timeout. No credentials, archive extraction or execution are involved.
 
 `FeatureChecks.cs` uses mock HTTP and temporary files; no real account, startup writes, network or notification service is required. Native layout tests add 160 language/clock-format/metric selections to the existing 16 references and 480 breakpoint transitions.
+
+## Capacity intelligence (1.9)
+
+`history_scope.py` derives installation-local HMAC scopes at the adapter boundary. `UsageHistory` v2 adds validated window samples alongside legacy aggregates in a separate file, with finite percentage checks, 30-day / 40,000-sample bounds and five-minute compaction. Newer schemas are read-only.
+
+`CapacityForecast.cs` is a pure local algorithm; see FORECASTING.md. The dashboard caches calculations for 30 seconds, refreshing on new readings. `CapacityViews.cs` composes secondary reset/tray views from normalized cached snapshots; opening them does not launch providers. Open views reevaluate freshness every 30 seconds. History charts break at gaps and replenishments and label projected lines as estimates.
+
+Existing reset/low alerts and opt-in predicted exhaustion share `NotificationState` delivery cooldown, with bounded persisted deduplication. Account-scoped keys use stable window IDs; legacy notification keys are conservatively honored during migration. Failed tray delivery is not marked delivered. Rapid-burn alerts are not implemented in 1.9. ForecastChecks covers deterministic time/correction/account/reset scenarios; native checks render all new views in four languages using synthetic account data.

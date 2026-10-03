@@ -15,13 +15,13 @@ public sealed partial class Widget
     readonly ProviderSchedule schedule=new();
     readonly Dictionary<string,JsonElement> providerData=new();
     UsageHistory history=new();LowQuotaAlerts lowAlerts=new();ProfileStore profiles=new();
-    TrayIcon? tray;bool featureChecks,placing;
+    TrayIcon? tray;bool featureChecks,forecastChecks,placing;
     double freeDiskGb;
     string SettingsPath=>System.IO.Path.Combine(Data,"preferences.json");
     void InitializeFeatures(bool startInTray)
     {
         Opacity=preferences.Opacity;ApplyMetricPreferences();
-        if(!preview&&!selftest){history=UsageHistory.Load(System.IO.Path.Combine(Data,"usage-history.json"),DateTimeOffset.UtcNow);lowAlerts=LowQuotaAlerts.Load(System.IO.Path.Combine(Data,"low-alerts.json"));profiles=ProfileStore.Load(System.IO.Path.Combine(Data,"profiles.json"));}
+        if(!preview&&!selftest){history=UsageHistory.Load(File.Exists(HistoryPath)?HistoryPath:System.IO.Path.Combine(Data,"usage-history.json"),DateTimeOffset.UtcNow);notifications=LocalJson.Load<NotificationState>(System.IO.Path.Combine(Data,"notification-state.json"))??new();lowAlerts=LowQuotaAlerts.Load(System.IO.Path.Combine(Data,"low-alerts.json"));profiles=ProfileStore.Load(System.IO.Path.Combine(Data,"profiles.json"));}
         if(profiles.Items.Count==0){
             profiles.Items.Add(new("Work",442,858,false,true,1,WidgetPreferences.MetricIds.ToList(),WidgetPreferences.MetricIds.ToList(),new(true)));
             profiles.Items.Add(new("Gaming",560,165,true,true,.9,WidgetPreferences.MetricIds.ToList(),new(){"cpu","ram","disk","net"},new()));
@@ -46,7 +46,7 @@ public sealed partial class Widget
     {
         if(!preferences.TrayEnabled){if(!IsVisible)ShowFromTray();tray?.Dispose();tray=null;return;}
         if(tray is not null)return;
-        try{tray=new TrayIcon(this,System.IO.Path.Combine(Root,"assets","prism.ico"),ShowFromTray,ShowTrayMenu);}catch{tray=null;footer.Text=L.T("System tray is unavailable. Prism will stay visible.");}
+        try{tray=new TrayIcon(this,System.IO.Path.Combine(Root,"assets","prism.ico"),ShowTrayCapacity,ShowTrayMenu);}catch{tray=null;footer.Text=L.T("System tray is unavailable. Prism will stay visible.");}
     }
     void ShowFromTray(){Show();WindowState=WindowState.Normal;Activate();}
     void HideToTray(){if(tray is null)return;SavePosition();DismissReminder();Hide();}
@@ -54,7 +54,7 @@ public sealed partial class Widget
     {
         var menu=new ContextMenu();
         void AddItem(string name,Action action){var item=new MenuItem{Header=L.T(name)};item.Click+=(_,_)=>action();menu.Items.Add(item);}
-        AddItem("Show Prism",ShowFromTray);AddItem("Refresh",async()=>await UpdateProviders(true));
+        AddItem("Capacity & resets",()=>{ShowFromTray();ShowCapacity();});AddItem("Show Prism",ShowFromTray);AddItem("Refresh",async()=>await UpdateProviders(true));
         AddItem("Settings",()=>{ShowFromTray();ShowPreferences();});AddItem("Usage history",()=>{ShowFromTray();ShowHistory();});
         menu.Items.Add(new Separator());AddItem("Exit Prism",Close);menu.Placement=PlacementMode.MousePoint;menu.IsOpen=true;
     }
@@ -87,7 +87,7 @@ public sealed partial class Widget
     }
     void RefreshDisplayedProviders()
     {
-        if(offline)return;var now=DateTimeOffset.UtcNow;latestReadings.Clear();
+        if(offline)return;var now=DateTimeOffset.UtcNow;latestReadings.Clear();RefreshForecasts();
         foreach(var (id,card) in cards){
             if(providerData.TryGetValue(id,out var data)){
                 var reading=QuotaSnapshot.Read(data,now);
@@ -100,7 +100,8 @@ public sealed partial class Widget
             }else card.MarkOffline();
             int seconds=schedule.Remaining(id,now);string countdown=seconds==0?L.T("due now"):TimeSpan.FromSeconds(seconds).ToString(seconds>=3600?@"h\:mm\:ss":@"m\:ss");
             string info=card.Element.ToolTip?.ToString()??ProviderName(id);int suffix=info.IndexOf('\u2063');if(suffix>=0)info=info[..suffix];
-            card.Element.ToolTip=info+"\u2063\n"+L.F("Next check: {0}",countdown);
+            string forecastText=preferences.ForecastEnabled?string.Join("\n",forecasts.Where(p=>p.Key.StartsWith(id+"\u001f",StringComparison.Ordinal)).Select(p=>p.Value.Describe())):"";
+            card.Element.ToolTip=info+"\u2063\n"+L.F("Next check: {0}",countdown)+(forecastText.Length>0?"\n"+forecastText:"");
         }
         if(!busy){string next=string.Join(" · ",WidgetPreferences.ProviderIds.Select(id=>ProviderName(id)+" "+TimeSpan.FromSeconds(schedule.Remaining(id,now)).ToString(@"h\:mm\:ss")));footer.Text=L.F("{0} of 4 sources current",cards.Values.Count(c=>c.Health=="ready"))+" · ↻ "+TimeSpan.FromSeconds(WidgetPreferences.ProviderIds.Min(id=>schedule.Remaining(id,now))).ToString(@"m\:ss");footer.ToolTip=L.F("Next check: {0}",next);foreach(var button in refreshButtons)button.ToolTip=footer.ToolTip;}
     }
@@ -110,17 +111,18 @@ public sealed partial class Widget
         lowAlerts.Notified??=new();var before=new Dictionary<string,long>(lowAlerts.Notified);
         var messages=lowAlerts.Due(latestReadings,DateTimeOffset.UtcNow,preferences.LowQuotaThreshold);
         if(messages.Count==0){if(before.Count!=lowAlerts.Notified.Count)SaveLowAlerts();return;}
-        if(tray is not null){if(!tray.Notify(L.T("Low quota"),string.Join("\n",messages))){lowAlerts.Notified=before;return;}}
-        else{
-            DismissReminder();var content=new StackPanel();content.Children.Add(Text("Low quota",14));foreach(var message in messages.Take(3))content.Children.Add(Text(message,12));
-            var panel=Panel(content,"#F02A344A",14);panel.Width=310;reminderPopup.Child=panel;reminderPopup.IsOpen=true;reminderTimer.Start();
-        }
+        if(!DeliverNotice("Low quota",messages)){lowAlerts.Notified=before;return;}
         SaveLowAlerts();
     }
     void SaveLowAlerts(){try{lowAlerts.Save(System.IO.Path.Combine(Data,"low-alerts.json"));}catch(IOException){}catch(UnauthorizedAccessException){}}
-    Window FeatureWindow(string title,double width=660,double height=660)=>new(){Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+    readonly Dictionary<string,double> featureOpenTimes=new();
+    Window FeatureWindow(string title,double width=660,double height=660)
+    {
+        var opened=Stopwatch.StartNew();var dialog=new Window{Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        if(selftest)dialog.Loaded+=(_,_)=>featureOpenTimes[title+"-"+L.Language]=opened.Elapsed.TotalMilliseconds;return dialog;
+    }
     static CheckBox Check(StackPanel panel,string label,bool value){var box=new CheckBox{Content=L.T(label),IsChecked=value,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,7,0,7)};panel.Children.Add(box);return box;}
-    static ComboBox Choose(StackPanel panel,string label,IEnumerable<object> values,object selected){panel.Children.Add(Text(label,12,Muted));var combo=new ComboBox{ItemsSource=values,SelectedItem=selected,Margin=new Thickness(0,6,0,14),Padding=new Thickness(7),Foreground=Brush("#142236"),Background=Brush("#EDF4FC")};panel.Children.Add(combo);return combo;}
+    static ComboBox Choose(StackPanel panel,string label,IEnumerable<object> values,object selected){panel.Children.Add(Text(label,12,Muted));var combo=new ComboBox{ItemsSource=values,SelectedItem=selected,Margin=new Thickness(0,6,0,14),Padding=new Thickness(7),Foreground=Brush("#142236"),Background=Brush("#EDF4FC")};System.Windows.Automation.AutomationProperties.SetName(combo,L.T(label));panel.Children.Add(combo);return combo;}
     void ShowPreferences()
     {
         var dialog=FeatureWindow("Settings");var shell=new DockPanel{Margin=new Thickness(20)};dialog.Content=shell;
@@ -145,19 +147,19 @@ public sealed partial class Widget
         var alerts=Tab("Alerts");var low=Check(alerts,"Enable low-quota alerts",preferences.LowQuotaEnabled);var threshold=Choose(alerts,"Remaining threshold (%)",new[]{5,10,15,20,25,30,40,50}.Cast<object>(),preferences.LowQuotaThreshold);
         alerts.Children.Add(Text("Each low-quota window alerts once until it recovers or resets. Background alerts use Windows notifications; your notification settings may suppress them.",12,Muted));
         alerts.Children.Add(Button("Reset reminders…","Reset reminders…",()=>{dialog.Close();ShowResetReminders();}));
-        var historyCheck=Check(alerts,"Save local quota history",preferences.HistoryEnabled);alerts.Children.Add(Text("History stores only provider, timestamp and remaining percentage for 30 days. Disabling recording preserves existing history until you clear it.",11,Muted));alerts.Children.Add(Button("Usage history","Usage history",()=>{dialog.Close();ShowHistory();}));
+        var forecastCheck=Check(alerts,"Show capacity estimates",preferences.ForecastEnabled);var capacityCheck=Check(alerts,"Enable predictive alerts",preferences.CapacityAlerts);var historyCheck=Check(alerts,"Save local quota history",preferences.HistoryEnabled);alerts.Children.Add(Text("History stores quota windows and opaque account scopes locally for 30 days. Disabling recording preserves saved history.",11,Muted));alerts.Children.Add(Button("Usage history","Usage history",()=>{dialog.Close();ShowHistory();}));
         BuildProfileSettings(Tab("Profiles"),dialog);BuildUpdateSettings(Tab("Updates"),dialog);
         var status=Text("",11,Muted);DockPanel.SetDock(status,Dock.Bottom);shell.Children.Insert(1,status);
         saveBar.Children.Add(Button("Cancel","Cancel",dialog.Close));
         saveBar.Children.Add(Button("Save","Save",()=>{
             if(enabled.Count==0){status.Text=L.T("At least one metric is required.");return;}
             var next=preferences.Copy();next.TrayEnabled=trayCheck.IsChecked==true||startup.IsChecked==true;next.SnapEdges=snap.IsChecked==true;next.Use24Hour=hours.IsChecked==true;next.Language=languageIds[Math.Max(0,language.SelectedIndex)];next.Opacity=opacity.Value;
-            next.LowQuotaEnabled=low.IsChecked==true;next.LowQuotaThreshold=threshold.SelectedItem is int value?value:20;next.HistoryEnabled=historyCheck.IsChecked==true;next.MetricOrder=ordered.ToList();next.VisibleMetrics=ordered.Where(enabled.Contains).ToList();
+            next.ForecastEnabled=forecastCheck.IsChecked==true;next.CapacityAlerts=capacityCheck.IsChecked==true;next.LowQuotaEnabled=low.IsChecked==true;next.LowQuotaThreshold=threshold.SelectedItem is int value?value:20;next.HistoryEnabled=historyCheck.IsChecked==true;next.MetricOrder=ordered.ToList();next.VisibleMetrics=ordered.Where(enabled.Contains).ToList();
             foreach(var (id,box) in rateBoxes)next.RefreshSeconds[id]=box.SelectedItem is int seconds?seconds:(id=="codex"?60:300);
             try{
                 next.Save(SettingsPath);
                 try{if((startup.IsChecked==true)!=StartupRegistration.Enabled)StartupRegistration.Set(startup.IsChecked==true);}catch{preferences.Save(SettingsPath);throw;}
-                preferences=next;L.Set(next.Language);Opacity=next.Opacity;schedule.Reset();ConfigureTray();ApplyMetricPreferences();AdaptLayout();dialog.Close();
+                preferences=next;RefreshForecasts(true);L.Set(next.Language);Opacity=next.Opacity;schedule.Reset();ConfigureTray();ApplyMetricPreferences();AdaptLayout();dialog.Close();
             }catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException){status.Text=L.T("Could not save settings. Check folder access or an existing startup registration.");}
         }));
         if(selftest)dialog.Loaded+=(_,_)=>{
@@ -217,12 +219,33 @@ public sealed partial class Widget
     }
     void ShowHistory()
     {
-        var dialog=FeatureWindow("Usage history",660,520);var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
+        var dialog=FeatureWindow("Usage history",680,660);var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Remaining allowance (%)",23));
-        var provider=Choose(stack,"Metrics",WidgetPreferences.ProviderIds.Select(id=>(object)ProviderName(id)),"Codex");var ranges=new[]{L.T("24 hours"),L.T("7 days"),L.T("30 days")};var range=Choose(stack,"Usage history",ranges,ranges[0]);
+        var provider=Choose(stack,"Metrics",WidgetPreferences.ProviderIds.Select(id=>(object)ProviderName(id)),"Codex");
+        var selector=Choose(stack,"Quota window",new object[]{L.T("Legacy aggregate")},L.T("Legacy aggregate"));
+        var ranges=new[]{L.T("24 hours"),L.T("7 days"),L.T("30 days")};var range=Choose(stack,"Usage history",ranges,ranges[0]);
+        var projection=Check(stack,"Show projected trajectory",selftest);projection.Visibility=preferences.ForecastEnabled?Visibility.Visible:Visibility.Collapsed;
         var summary=Text("",12,Muted);var chart=new HistoryChart{Height=185,Margin=new Thickness(0,10,0,10)};stack.Children.Add(chart);stack.Children.Add(summary);
-        void Update(){string id=WidgetPreferences.ProviderIds[Math.Max(0,provider.SelectedIndex)];int days=range.SelectedIndex switch{1=>7,2=>30,_=>1};var end=DateTimeOffset.UtcNow;var start=end.AddDays(-days);var points=history.Points.Where(p=>p.Provider==id&&p.At>=start.ToUnixTimeSeconds()).OrderBy(p=>p.At).ToArray();chart.Set(points,start,end);summary.Text=points.Length==0?L.T("No readings yet. History fills as fresh quota arrives."):L.F("{0} samples · latest {1:0.#}%",points.Length,points[^1].Remaining);}
-        provider.SelectionChanged+=(_,_)=>Update();range.SelectionChanged+=(_,_)=>Update();Update();
-        stack.Children.Add(Button("Clear history","Clear history",()=>{if(MessageBox.Show(dialog,L.T("Clear the local quota history? This cannot be undone."),"Prism",MessageBoxButton.YesNo)!=MessageBoxResult.Yes)return;try{var cleared=new UsageHistory();cleared.Save(System.IO.Path.Combine(Data,"usage-history.json"));history=cleared;Update();}catch(IOException){summary.Text=L.T("Could not save settings.");}catch(UnauthorizedAccessException){summary.Text=L.T("Could not save settings.");}}));dialog.ShowDialog();
+        bool changing=false;
+        string Provider()=>WidgetPreferences.ProviderIds[Math.Max(0,provider.SelectedIndex)];
+        void Update(){
+            if(changing)return;string id=Provider();int days=range.SelectedIndex switch{1=>7,2=>30,_=>1};var now=DateTimeOffset.UtcNow;var start=now.AddDays(-days);var end=now;
+            var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;
+            string selected=(selector.SelectedItem as ComboBoxItem)?.Tag as string??"";UsagePoint[] points;long[] markers=Array.Empty<long>();CapacityEstimate? estimate=null;
+            if(selected.Length==0)points=history.Points.Where(p=>p.Provider==id&&p.At>=start.ToUnixTimeSeconds()).OrderBy(p=>p.At).ToArray();
+            else{
+                var samples=history.Samples.Where(p=>p.Provider==id&&p.Scope==reading?.Scope&&p.Window==selected&&p.At>=start.ToUnixTimeSeconds()).OrderBy(p=>p.At).ToArray();
+                points=samples.Select(p=>new UsagePoint(p.Provider,p.At,p.Remaining)).ToArray();markers=samples.Where(p=>p.Reset.HasValue).Select(p=>p.Reset!.Value).Distinct().Where(t=>t<=now.ToUnixTimeSeconds()).ToArray();
+                var quota=reading?.Windows.FirstOrDefault(w=>(string.IsNullOrEmpty(w.Id)?w.Label:w.Id)==selected);
+                if(quota is not null&&preferences.ForecastEnabled){estimate=CapacityForecast.Calculate(history.Samples,id,reading!,quota,now);if(projection.IsChecked==true&&estimate.Reliable&&quota.Reset is DateTimeOffset reset&&reset-now<=TimeSpan.FromHours(24))end=reset;}
+            }
+            chart.Set(points,start,end,markers,end>now?estimate:null,now);
+            summary.Text=points.Length==0?L.T("No readings yet. History fills as fresh quota arrives."):L.F("{0} samples · latest {1:0.#}%",points.Length,points[^1].Remaining);
+            if(estimate is not null)summary.Text+="\n"+estimate.Describe();
+        }
+        void SelectWindows(){changing=true;string id=Provider();var now=DateTimeOffset.UtcNow;var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;
+            var choices=reading?.Windows.Select(w=>(object)new ComboBoxItem{Content=w.Label,Tag=string.IsNullOrEmpty(w.Id)?w.Label:w.Id}).ToList()??new();choices.Add(new ComboBoxItem{Content=L.T("Legacy aggregate"),Tag=""});selector.ItemsSource=choices;selector.SelectedIndex=0;changing=false;Update();}
+        provider.SelectionChanged+=(_,_)=>SelectWindows();selector.SelectionChanged+=(_,_)=>Update();range.SelectionChanged+=(_,_)=>Update();projection.Checked+=(_,_)=>Update();projection.Unchecked+=(_,_)=>Update();SelectWindows();
+        stack.Children.Add(Button("Clear history","Clear history",()=>{if(MessageBox.Show(dialog,L.T("Clear the local quota history? This cannot be undone."),"Prism",MessageBoxButton.YesNo)!=MessageBoxResult.Yes)return;try{var cleared=new UsageHistory();cleared.Save(HistoryPath);cleared.Save(System.IO.Path.Combine(Data,"usage-history.json"));history=cleared;RefreshForecasts(true);Update();}catch(IOException){summary.Text=L.T("Could not save settings.");}catch(UnauthorizedAccessException){summary.Text=L.T("Could not save settings.");}}));UpdateWhileOpen(dialog,Update);CaptureFeature(dialog,"history");dialog.ShowDialog();
     }
 }

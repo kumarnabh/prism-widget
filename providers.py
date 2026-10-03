@@ -2,6 +2,7 @@
 import concurrent.futures, datetime, json, math, os, pathlib, queue, shutil, sqlite3, subprocess, sys, threading, time
 import auto_sources
 import claude_cli
+from history_scope import codex_scope
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / 'data'
@@ -29,7 +30,7 @@ def normalize_codex(result):
             label = ('7-day' if mins == 10080 else '5-hour' if mins == 300 else f'{mins:g} min' if number(mins) else name)
             if len(buckets) > 1: label = f'{bucket.get("limitName") or key} / {label}'
             item = window(w.get('usedPercent'), w.get('resetsAt'), label)
-            if item: windows.append(item)
+            if item: windows.append({**item,'id':f'{key}:{name}'})
     return windows
 
 def codex_telemetry():
@@ -75,6 +76,7 @@ def codex_api():
         candidates = list((HOME/'AppData/Local/OpenAI/Codex/bin').glob('*/codex.exe'))
         if candidates: exe = str(max(candidates, key=lambda x:x.stat().st_mtime))
     if not exe: return {'status':'Connect', 'detail':'Sign in to the Codex CLI to read your quota.'}
+    scope_before=codex_scope(DATA)
     p = subprocess.Popen([exe,'app-server'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                          stderr=subprocess.DEVNULL, text=True, encoding='utf-8', creationflags=0x08000000 if os.name=='nt' else 0)
     messages=queue.Queue()
@@ -100,7 +102,9 @@ def codex_api():
         send({'id':2,'method':'account/rateLimits/read'})
         windows=normalize_codex(response(2))
         if not windows: return {'status':'Unavailable','detail':'This account returned no active quota windows.'}
-        return {'status':'Live','source':'Codex account API','at':time.time(),'windows':windows}
+        scope_after=codex_scope(DATA)
+        if scope_before!=scope_after: return {'status':'Unavailable','detail':'Codex sign-in changed during collection. Refresh to read the current account.'}
+        return {'status':'Live','source':'Codex account API','at':time.time(),'windows':windows,'scope':scope_after}
     finally:
         p.terminate()
         try: p.wait(timeout=3)
