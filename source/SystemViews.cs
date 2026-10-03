@@ -118,7 +118,7 @@ public sealed partial class Widget
         foreach(string language in new[]{"en","hi","es","fr"}){
             L.Set(language);ShowSystemCapacity();ShowConsumers();
             foreach(var visible in new[]{WidgetPreferences.MetricIds,Array.Empty<string>(),new[]{"gpu","vram"}})foreach(var size in new[]{(340d,220d),(442d,858d),(560d,165d),(840d,800d),(1200d,120d)}){
-                preferences.VisibleMetrics=visible.ToList();ApplyMetricPreferences();ApplyPreset(size.Item1,size.Item2);UpdateLayout();AdaptLayout();UpdateLayout();var check=CheckLayout();systemLayouts.Add(new{language,metrics=visible.Length,width=ActualWidth,height=ActualHeight,check.fits,check.controls,check.scale});
+                preferences.VisibleMetrics=visible.ToList();ApplyMetricPreferences();ApplyPreset(size.Item1,size.Item2);UpdateLayout();AdaptLayout();UpdateLayout();var check=CheckLayout();if(metricTiles["vram"].Label!=L.T("Dedicated VRAM"))throw new InvalidOperationException("Metric label follows current language");systemLayouts.Add(new{language,metrics=visible.Length,width=ActualWidth,height=ActualHeight,check.fits,check.controls,check.scale});
                 if(language=="en"&&visible.Length==WidgetPreferences.MetricIds.Length)SavePreview($"preview-system-grid-{(int)size.Item1}x{(int)size.Item2}.png",2);
             }
         }

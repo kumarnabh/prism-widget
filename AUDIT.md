@@ -14,6 +14,8 @@ Existing metric selections, ordering, clocks, history and provider caches are pr
 
 A follow-up short sample including taskbar progress measured 1.9 visible 4.94% of one core / 177.18 MiB and 2.0 visible 6.12% / 179.58 MiB; 2.0 hidden 5.59% / 178.16 MiB. Startup observations were 400/678/374 ms and tray opening about 67 ms. Added Windows sensor/taskbar work has a measurable cost (about 1.18 percentage points of one core and 2.4 MiB in this sample), justified by the new capacity data; uncontrolled load limits precision. Hidden/full-dashboard compact tiles now skip unnecessary value/graph updates, while background snapshots, provider checks and taskbar bars remain current. Existing-user profiles also receive the optional System capacity preset without overwriting names, and confirmed desktop battery absence hides that optional metric.
 
+Final diff review corrected dynamic metric-label translation after a language change, with a native regression check.
+
 ## 1.9.0 capacity intelligence — 2026-10-03
 
 Hosted validation follow-up: the original PR passed both Python matrices, but a main-commit native job hit the 60-second harness deadline. Successful hosted native runs took 46 and 55 seconds with the expanded translated exports. CI now allows a bounded 120 seconds, preserving every functional/layout assertion and the local 60-second default. Timeout diagnostics report which fixed-name synthetic exports completed. The release stays gated on passing follow-up checks; no blind rerun or assertion removal was used.

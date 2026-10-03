@@ -853,6 +853,7 @@ public sealed partial class Widget : Window
         readonly Ellipse stateDot=new(){Width=4,Height=4,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(4,0,0,0)};
         readonly Meter meter;
         readonly string name;readonly TextBlock label;
+        public string Label=>label.Text;
         double fontSize=20;
         bool showChart;
         public MetricTile(string name,string icon,string color)
@@ -873,7 +874,7 @@ public sealed partial class Widget : Window
         }
         public void Set(string text,string tooltip,double? percent,List<double>? history=null,string health="ready")
         {
-            value.Text=text;value.FontSize=text.Length>8?Math.Min(fontSize,13):fontSize;
+            label.Text=L.T(name);value.Text=text;value.FontSize=text.Length>8?Math.Min(fontSize,13):fontSize;
             Element.ToolTip=tooltip;System.Windows.Automation.AutomationProperties.SetName(Element,L.T(name)+" · "+text+" · "+L.T(health=="ready"?"Current":health=="stale"?"Stale":health=="error"?"Error":"Unavailable"));
             meter.Value=percent??0;meter.Opacity=percent.HasValue?(health=="stale"?.35:1):.15;
             Element.Opacity=1;
