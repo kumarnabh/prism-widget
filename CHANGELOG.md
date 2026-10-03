@@ -1,5 +1,15 @@
 # Change log
 
+## 2.0.0 — System capacity
+
+- Background normalized Windows sensor snapshots: GPU percentage, dedicated VRAM, CPU frequency, battery and disk activity, with secondary multi-GPU/disk details.
+- Optional local top CPU/RAM consumers and a fixed-path Task Manager shortcut; no process termination or persisted process history.
+- Taskbar minimization with live cached thumbnail/Peek bars and a compact ribbon near the taskbar.
+- Full metric visibility/order, empty selections, active-AI filtering and a System capacity profile; existing choices migrate unchanged.
+- Four-language additions, adaptive minimum heights and readable large-metric layouts.
+- Fixed stale system values after failures, excessive recurring layout work, native taskbar bitmap bounds and connection-triggered layout reconciliation.
+- Unsupported advanced hardware sensors are explicitly deferred; no dependency, endpoint, credential or telemetry change.
+
 ## 1.9.0 — Capacity intelligence
 
 - Local account/window-scoped history and conservative burn-rate, sustainable pace, reset projection and exhaustion estimates.

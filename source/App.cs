@@ -85,10 +85,10 @@ public sealed partial class Widget : Window
     readonly List<double> cpuHistory=new(), ramHistory=new();
     readonly UsageGauge cpuGauge=new("#6AF5E2"),ramGauge=new("#C2ADFF");
     readonly DispatcherTimer systemTimer=new(){Interval=TimeSpan.FromSeconds(2)}, providerTimer=new(){Interval=TimeSpan.FromSeconds(5)};
-    ulong oldIdle,oldKernel,oldUser;
-    long oldReceived,oldSent; DateTime networkAt=DateTime.UtcNow;
+    readonly SystemCapacity hardware=new();
+    HardwareSnapshot? hardwareFixture;bool systemChecks;
     bool busy,closed,compact;
-    bool memoryReady,diskReady,networkReady;
+    bool cpuReady,memoryReady,diskReady;
     Process? collector;
     readonly System.Threading.CancellationTokenSource lifetime=new();
     readonly List<Button> refreshButtons=new();
@@ -131,11 +131,11 @@ public sealed partial class Widget : Window
             UpdateSystem(); systemTimer.Start(); providerTimer.Start(); await UpdateProviders(true);
             if(preview || selftest) {
                 await System.Threading.Tasks.Task.Delay(5000); UpdateSystem();
-                if(selftest){forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
+                if(selftest){systemChecks=SystemCapacityChecks.Verify();forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
                 SavePreview(); Close();
             }
         };
-        Closed+=(_,_)=>{closed=true;DismissReminder();trayView?.Close();tray?.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
+        Closed+=(_,_)=>{closed=true;DismissReminder();trayView?.Close();tray?.Dispose();taskbarPreview?.Dispose();hardware.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
         KeyDown+=async (_,e)=>{
             if(e.Key==Key.F5){await UpdateProviders(true);e.Handled=true;}
             else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.P){SetPinned(!Topmost);e.Handled=true;}
@@ -214,7 +214,7 @@ public sealed partial class Widget : Window
             Item("Focus · 560 × 220","",()=>ApplyPreset(560,220));
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
             menu.Items.Add(new Separator());Item("Free RAM","",ShowMemory);Item("Settings","Ctrl+,",ShowPreferences);Item("Connections…","",()=>ShowConnection("cursor","Cursor"));
-            Item("Capacity & resets","",ShowCapacity);Item("Usage history","",ShowHistory);if(tray is not null)Item("Hide to tray","",HideToTray);
+            Item("System capacity","",ShowSystemCapacity);Item("Minimize to taskbar","",MinimizeToTaskbar);Item("Taskbar ribbon","",DockRibbon);Item("Capacity & resets","",ShowCapacity);Item("Usage history","",ShowHistory);if(tray is not null)Item("Hide to tray","",HideToTray);
             Item("World clocks…","",ShowClocks);Item("Reset reminders…","",ShowResetReminders);
             Item("Diagnostics…","",async()=>await ShowDiagnostics());
             menu.Items.Add(new Separator());Item("Close Prism","Esc",Close);
@@ -308,14 +308,16 @@ public sealed partial class Widget : Window
                 tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowConnection(spec.Item1,spec.Item2);};
             }
         }
-        metricBody.Children.Add(metricGrid);
+        foreach(string id in WidgetPreferences.ExtraMetricIds){var tile=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");metricTiles[id]=tile;tile.Element.Cursor=Cursors.Hand;tile.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};}
+        metricBody.Children.Add(metricGrid);metricBody.Children.Add(emptyMetrics);
     }
     void SyncMetricValues()
     {
-        metricTiles["cpu"].Set(cpuValue.Text,$"CPU · {cpuValue.Text} · {Environment.ProcessorCount} logical cores",cpuHistory.Count>0?cpuHistory[^1]:null,cpuHistory,health:cpuHistory.Count>0?"ready":"unknown");
+        metricTiles["cpu"].Set(cpuValue.Text,$"CPU · {cpuValue.Text} · {Environment.ProcessorCount} logical cores",cpuReady&&cpuHistory.Count>0?cpuHistory[^1]:null,cpuHistory,health:cpuReady?"ready":"unknown");
         metricTiles["ram"].Set(ramValue.Text,$"Memory · {ramValue.Text} · {ramDetail.Text}",memoryReady?ramBar.Value:null,ramHistory,health:memoryReady?"ready":"unknown");
         metricTiles["disk"].Set(diskReady?$"{freeDiskGb:0.0} GB":"—",L.T("Free disk")+" · "+diskValue.Text,diskReady?diskBar.Value:null,health:diskReady?"ready":"unknown");
         metricTiles["net"].Set(netValue.Text.Replace(" KB/s","K").Replace(" MB/s","M"),"Network download / upload · "+netValue.Text,null,health:netValue.Text!="—"?"ready":"unknown");
+        SyncHardwareTiles();
         foreach(var (key,card) in cards)metricTiles[key].Set(card.CompactValue,card.Element.ToolTip?.ToString()??key,card.Remaining,health:card.Health);
     }
     void AdaptLayout()
@@ -323,29 +325,32 @@ public sealed partial class Widget : Window
         if(adapting||cards.Count!=4)return;adapting=true;
         try{
             double width=ActualWidth>0?ActualWidth:Width,height=ActualHeight>0?ActualHeight:Height;
-            MinHeight=width>=1002?120:width>=522?165:220;
+            MinHeight=MinimumMetricHeight(width);
             worldClockRow.Visibility=clockPreferences.Enabled?Visibility.Visible:Visibility.Collapsed;
             compactTimes.Visibility=clockPreferences.Enabled?Visibility.Visible:Visibility.Collapsed;
             narrowClocks=width<650;compactBrand.Visibility=clockPreferences.Enabled&&narrowClocks?Visibility.Collapsed:Visibility.Visible;
             UpdateClocks();
             metricPin.Content=Topmost?"◆":"◇";
-            metricsOnly=compact||height<640;
+            metricsOnly=compact||height<640||metricGrid.Children.Count==0||preferences.VisibleMetrics.Any(WidgetPreferences.ExtraMetricIds.Contains);
             expandedBody.Visibility=metricsOnly?Visibility.Collapsed:Visibility.Visible;
             metricBody.Visibility=metricsOnly?Visibility.Visible:Visibility.Collapsed;
             if(metricsOnly){
                 density=3;frame.Padding=new Thickness(10);double availableWidth=width-42;
-                body.Width=Math.Max(1,availableWidth);metricGrid.Columns=Math.Min(preferences.VisibleMetrics.Count,availableWidth>=960?8:availableWidth>=480?4:2);
+                body.Width=Math.Max(1,availableWidth);metricGrid.Columns=Math.Max(1,Math.Min(metricGrid.Children.Count,availableWidth>=960?8:availableWidth>=480?4:2));
+                emptyMetrics.Visibility=metricGrid.Children.Count==0?Visibility.Visible:Visibility.Collapsed;
+                bool tileTight=height<280||height<400&&metricGrid.Children.Count>8;
                 bool charts=height>=340&&availableWidth/metricGrid.Columns>=130;
-                foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,charts,height<280);
+                foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,charts,tileTight,height>=400);
                 SyncMetricValues();
                 metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();
                 body.Measure(new Size(availableWidth,double.PositiveInfinity));
                 // A UniformGrid gives every row the chart row's height. Check the whole grid,
                 // not just the window threshold, before enabling charts in a narrow layout.
                 if(charts&&body.DesiredSize.Height>height-42){
-                    foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,height<280);
+                    foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,tileTight,height>=400);
                     SyncMetricValues();metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();body.Measure(new Size(availableWidth,double.PositiveInfinity));
                 }
+                if(body.DesiredSize.Height>height-42){foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,true,false);SyncMetricValues();metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();body.Measure(new Size(availableWidth,double.PositiveInfinity));}
                 return;
             }
             for(int level=compact?2:0;level<=2;level++){
@@ -397,7 +402,7 @@ public sealed partial class Widget : Window
                 var displays=DesktopLayout.Displays(this);var display=displays.FirstOrDefault(d=>d.Id==saved.monitor)??DesktopLayout.Current(this);
                 var work=display.Work;MaxWidth=Math.Max(MinWidth,work.Width);MaxHeight=Math.Max(MinHeight,work.Height);
                 double width=double.IsFinite(saved.width)?Math.Clamp(saved.width,MinWidth,MaxWidth):442;
-                Width=width;MinHeight=width>=1002?120:width>=522?165:220;
+                Width=width;MinHeight=MinimumMetricHeight(width);
                 double height=double.IsFinite(saved.height)?Math.Clamp(saved.height,MinHeight,MaxHeight):Math.Min(858,MaxHeight);
                 bool relative=saved.monitor==display.Id&&double.IsFinite(saved.offsetX)&&double.IsFinite(saved.offsetY);
                 double left=relative?work.Left+saved.offsetX:saved.left,top=relative?work.Top+saved.offsetY:saved.top;
@@ -413,18 +418,9 @@ public sealed partial class Widget : Window
     void UpdateSystem()
     {
         UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
-        try {
-            if(Native.GetSystemTimes(out var idle,out var kernel,out var user)) {
-                if(oldKernel!=0) {double all=(kernel-oldKernel)+(user-oldUser);double usage=all<=0?0:Math.Clamp(100*(1-(idle-oldIdle)/all),0,100);cpuValue.Text=$"{usage:0}%";cpuGauge.Set(usage);Plot(cpuHistory,cpuGraph,usage);}
-                oldIdle=idle;oldKernel=kernel;oldUser=user;
-            }
-            var mem=new Native.MemoryStatus();mem.Length=(uint)Marshal.SizeOf<Native.MemoryStatus>();
-            if(Native.GlobalMemoryStatusEx(ref mem)){var used=(mem.TotalPhys-mem.AvailPhys)/1073741824d;ramValue.Text=$"{mem.MemoryLoad}%";ramDetail.Text=$"{used:0.0} / {mem.TotalPhys/1073741824d:0.0} GB";ramBar.Value=mem.MemoryLoad;memoryReady=true;ramGauge.Set(mem.MemoryLoad);Plot(ramHistory,ramGraph,mem.MemoryLoad);}
-            var drive=new DriveInfo(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!);freeDiskGb=drive.AvailableFreeSpace/1073741824d;diskValue.Text=L.F("{0:0.0} GB free",freeDiskGb);diskBar.Value=100*(double)drive.AvailableFreeSpace/drive.TotalSize;diskReady=true;
-            long received=0,sent=0;foreach(var nic in NetworkInterface.GetAllNetworkInterfaces().Where(n=>n.OperationalStatus==OperationalStatus.Up&&(n.NetworkInterfaceType==NetworkInterfaceType.Ethernet||n.NetworkInterfaceType==NetworkInterfaceType.Wireless80211))) {var s=nic.GetIPv4Statistics();received+=s.BytesReceived;sent+=s.BytesSent;}
-            var now=DateTime.UtcNow;var seconds=(now-networkAt).TotalSeconds;if(networkReady&&seconds>0)netValue.Text=$"{Rate(Math.Max(0,received-oldReceived)/seconds)} / {Rate(Math.Max(0,sent-oldSent)/seconds)}";networkReady=true;oldReceived=received;oldSent=sent;networkAt=now;
-        } catch {footer.Text="A system sensor is unavailable";}
-        AdaptLayout();
+        ReadSystemSnapshot();ReconcileMetricVisibility();SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
+        // Values update while hidden/minimized; resize/density work runs on actual layout changes.
+        if(IsVisible&&WindowState==WindowState.Normal){cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);}
     }
     static string Rate(double bytes)=>bytes>1048576?$"{bytes/1048576:0.0} MB/s":$"{bytes/1024:0} KB/s";
     static void Plot(List<double> history,Sparkline chart,double value){history.Add(value);if(history.Count>36)history.RemoveAt(0);chart.SetSamples(history);}
@@ -694,7 +690,7 @@ public sealed partial class Widget : Window
         foreach(var size in new[]{(340d,220d),(400d,430d),(560d,165d),(442d,600d),(442d,858d),(840d,260d),(840d,800d),(1200d,120d)}){
             Width=size.Item1;Height=size.Item2;UpdateLayout();AdaptLayout();UpdateLayout();
             var bounds=body.TransformToAncestor(this).TransformBounds(new Rect(0,0,body.ActualWidth,body.ActualHeight));
-            var all=metricsOnly?metricTiles.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{metricHeader}):cards.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{fullHeader,cpuPanel,ramPanel,extras,section,bottom});
+            var all=metricsOnly?WidgetPreferences.BaseMetricIds.Select(id=>(FrameworkElement)metricTiles[id].Element).Concat(new FrameworkElement[]{metricHeader}):cards.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{fullHeader,cpuPanel,ramPanel,extras,section,bottom});
             all=all.Concat((metricsOnly?compactActions:fullActions).Buttons);
             if(showClocks)all=all.Concat(metricsOnly?new FrameworkElement[]{compactTimes}:new FrameworkElement[]{worldClockRow,firstTime,secondTime});
             bool visible=all.All(el=>{var box=el.TransformToAncestor(this).TransformBounds(new Rect(0,0,el.ActualWidth,el.ActualHeight));return el.IsVisible&&box.Left>=10&&box.Top>=10&&box.Right<=ActualWidth-9&&box.Bottom<=ActualHeight-9;});
@@ -720,7 +716,7 @@ public sealed partial class Widget : Window
             using(var fixture=JsonDocument.Parse(JsonSerializer.Serialize(new{status="Live",at=DateTimeOffset.UtcNow.ToUnixTimeSeconds(),windows=new[]{new{label="Session",remaining=100.0,reset=DateTimeOffset.UtcNow.AddHours(2).ToUnixTimeSeconds()}}})))foreach(var card in cards.Values)card.Update(fixture.RootElement);
             diskValue.Text=L.F("{0:0.0} GB free",freeDiskGb);
             if(use24)ShowPreferences();
-            foreach(var visible in new[]{WidgetPreferences.MetricIds,new[]{"cpu"},new[]{"ram","disk","net"},new[]{"claude","cursor","codex"}}){
+            foreach(var visible in new[]{WidgetPreferences.BaseMetricIds,new[]{"cpu"},new[]{"ram","disk","net"},new[]{"claude","cursor","codex"}}){
                 preferences.VisibleMetrics=visible.ToList();preferences.MetricOrder=WidgetPreferences.MetricIds.Reverse().ToList();ApplyMetricPreferences();
                 foreach(var size in new[]{(340d,220d),(442d,858d),(560d,165d),(840d,800d),(1200d,120d)}){
                     ApplyPreset(size.Item1,size.Item2);UpdateLayout();AdaptLayout();UpdateLayout();var check=CheckLayout();
@@ -730,9 +726,9 @@ public sealed partial class Widget : Window
                 }
             }
         }
-        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();
+        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();VerifySystemViews();
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,systemChecks,systemLayouts,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     (bool fits,bool controls,double scale) CheckLayout()
     {
@@ -856,12 +852,12 @@ public sealed partial class Widget : Window
         readonly Sparkline chart;
         readonly Ellipse stateDot=new(){Width=4,Height=4,VerticalAlignment=VerticalAlignment.Center,Margin=new Thickness(4,0,0,0)};
         readonly Meter meter;
-        readonly string name;
+        readonly string name;readonly TextBlock label;
         double fontSize=20;
         bool showChart;
         public MetricTile(string name,string icon,string color)
         {
-            this.name=name;var content=new StackPanel();var row=Columns(24,-1,8);
+            this.name=name;var content=new StackPanel();label=Text(name,11,Muted);label.Margin=new Thickness(0,0,0,5);label.Visibility=Visibility.Collapsed;content.Children.Add(label);var row=Columns(24,-1,8);
             var mark=Text(icon,18);mark.Foreground=Brush(color);mark.VerticalAlignment=VerticalAlignment.Center;Add(row,mark,0);
             value.Foreground=Brush(color);value.TextWrapping=TextWrapping.NoWrap;value.HorizontalAlignment=HorizontalAlignment.Right;Add(row,value,1);Add(row,stateDot,2);content.Children.Add(row);
             chart=new Sparkline(color){Height=28,Margin=new Thickness(0,5,0,0)};content.Children.Add(chart);
@@ -869,7 +865,8 @@ public sealed partial class Widget : Window
             Element=Panel(content,"#75263853",12);Element.Padding=new Thickness(7,5,7,5);Element.Margin=new Thickness(0,0,5,5);Element.Focusable=true;
             System.Windows.Automation.AutomationProperties.SetName(Element,name);
         }
-        public void Arrange(double width,bool charts,bool tight){
+        public void Arrange(double width,bool charts,bool tight,bool labels=false){
+            label.Visibility=labels?Visibility.Visible:Visibility.Collapsed;
             fontSize=tight?16:width<140?17:21;showChart=charts;
             Element.Padding=new Thickness(7,tight?1:5,7,tight?1:5);Element.Margin=new Thickness(0,0,5,tight?3:5);
             meter.Margin=new Thickness(0,tight?2:4,0,0);
@@ -877,7 +874,7 @@ public sealed partial class Widget : Window
         public void Set(string text,string tooltip,double? percent,List<double>? history=null,string health="ready")
         {
             value.Text=text;value.FontSize=text.Length>8?Math.Min(fontSize,13):fontSize;
-            Element.ToolTip=tooltip;System.Windows.Automation.AutomationProperties.SetName(Element,name+" · "+text);
+            Element.ToolTip=tooltip;System.Windows.Automation.AutomationProperties.SetName(Element,L.T(name)+" · "+text+" · "+L.T(health=="ready"?"Current":health=="stale"?"Stale":health=="error"?"Error":"Unavailable"));
             meter.Value=percent??0;meter.Opacity=percent.HasValue?(health=="stale"?.35:1):.15;
             Element.Opacity=1;
             stateDot.Fill=Brush(health=="ready"?"#6AF5E2":health=="stale"?"#E8B96D":health=="error"?"#DEA1A5":"#7A8A9D");

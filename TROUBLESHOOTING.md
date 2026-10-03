@@ -8,6 +8,11 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Terminal dependency error | Run Setup again. Never copy `.venv` or `vendor` from another machine/Python version. |
 | Access denied | Extract into a writable folder; close Prism before replacing binaries. Avoid Program Files/read-only shares. |
 | Missing .NET | Release ZIP includes .NET. Source builds need the .NET 8 SDK. |
+| GPU/disk rate is a dash | Wait for two sensor captures (about six seconds). Drivers/counters may not expose data; unsupported is never zero. See docs/SYSTEM-METRICS.md. |
+| GPU metric missing | Enable GPU in Settings → Metrics or load System capacity profile. Existing visibility settings are preserved. |
+| AI card disappeared | Active-AI filtering needs valid quota windows; turn it off in Settings → Metrics to see disconnected sources. It does not verify paid entitlement. |
+| Empty widget | Choose metrics in Settings (Ctrl+,); Hide all is supported and does not remove controls. |
+| Want taskbar instead of tray | Use ⋯ → Minimize to taskbar, or turn off Minimize to tray in General. Hover the taskbar button for live bars. Taskbar ribbon stays visible above the work-area edge. |
 | Unknown publisher | Binaries are unsigned. Review source/checksum before running; do not disable Windows security globally. |
 | Quota is a dash | No valid window returned. Check sign-in, tooltip and Connections. Unknown means neither zero nor full. |
 | Codex stale | Active-account verification failed; historical data is unverified and cannot trigger alerts. Check CLI sign-in. |

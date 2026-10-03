@@ -27,6 +27,34 @@ public static class L
         if(Application.Current is not null)foreach(var key in Words.Keys)Application.Current.Resources["t."+key]=T(key);
     }
     const string Data="""
+System capacity|सिस्टम क्षमता|Capacidad del sistema|Capacité système
+GPU|GPU|GPU|GPU
+Dedicated VRAM|समर्पित VRAM|VRAM dedicada|VRAM dédiée
+CPU frequency|CPU आवृत्ति|Frecuencia de CPU|Fréquence du CPU
+Battery|बैटरी|Batería|Batterie
+Disk read|डिस्क पढ़ना|Lectura del disco|Lecture disque
+Disk write|डिस्क लिखना|Escritura del disco|Écriture disque
+Current|वर्तमान|Actual|Actuel
+Charging|चार्ज हो रहा है|Cargando|En charge
+Discharging|बैटरी पर|Descargando|Sur batterie
+Plugged in|पावर से जुड़ा|Conectado|Branché
+Minimize to tray|ट्रे में छोटा करें|Minimizar a la bandeja|Réduire dans la zone de notification
+Minimize to taskbar|टास्कबार में छोटा करें|Minimizar a la barra de tareas|Réduire dans la barre des tâches
+Taskbar ribbon|टास्कबार रिबन|Cinta junto a la barra|Ruban près de la barre des tâches
+Taskbar bar metric|टास्कबार बार का मेट्रिक|Métrica de barra de tareas|Mesure de la barre des tâches
+None|कोई नहीं|Ninguna|Aucune
+Only active AI subscriptions|केवल सक्रिय AI सदस्यता|Solo suscripciones de IA activas|Abonnements IA actifs uniquement
+Active means a provider has quota windows. Prism cannot verify paid subscription entitlement. Stale readings remain marked stale.|सक्रिय का अर्थ उपलब्ध कोटा है। Prism भुगतान वाली सदस्यता की पुष्टि नहीं करता। पुरानी रीडिंग चिन्हित रहती हैं।|Activo significa que el proveedor muestra cuotas. Prism no verifica suscripciones de pago. Los datos antiguos siguen marcados.|Actif signifie que le fournisseur expose des quotas. Prism ne vérifie pas les abonnements payants. Les relevés périmés restent signalés.
+Show all metrics|सभी मेट्रिक दिखाएँ|Mostrar todas las métricas|Afficher toutes les mesures
+Hide all metrics|सभी मेट्रिक छिपाएँ|Ocultar todas las métricas|Masquer toutes les mesures
+No metrics selected|कोई मेट्रिक नहीं चुना|Sin métricas seleccionadas|Aucune mesure sélectionnée
+No metrics selected. Open Settings to choose metrics.|कोई मेट्रिक नहीं चुना। सेटिंग्स में चुनें।|Sin métricas seleccionadas. Abra Ajustes para elegirlas.|Aucune mesure sélectionnée. Choisissez-les dans les paramètres.
+Windows-reported values. Unsupported sensors stay unavailable.|Windows द्वारा दिए आँकड़े। असमर्थित सेंसर अनुपलब्ध रहते हैं।|Valores de Windows. Los sensores no compatibles no están disponibles.|Valeurs fournies par Windows. Les capteurs non pris en charge restent indisponibles.
+GPU metrics unavailable|GPU मेट्रिक अनुपलब्ध|Métricas de GPU no disponibles|Mesures GPU indisponibles
+Top resource consumers|अधिक संसाधन उपयोग करने वाले ऐप|Procesos que más consumen|Processus les plus gourmands
+Process names and current usage stay local and are never saved.|प्रक्रिया नाम और उपयोग स्थानीय रहते हैं और सहेजे नहीं जाते।|Los nombres y el uso de procesos son locales y no se guardan.|Les noms et l’usage des processus restent locaux et ne sont pas enregistrés.
+Open Task Manager|टास्क मैनेजर खोलें|Abrir Administrador de tareas|Ouvrir le Gestionnaire des tâches
+Temperature, package power and battery health are unavailable without dependable hardware support.|विश्वसनीय हार्डवेयर समर्थन के बिना तापमान, ऊर्जा और बैटरी स्वास्थ्य अनुपलब्ध हैं।|La temperatura, potencia y salud de batería requieren soporte fiable del hardware.|La température, la puissance et l’état de la batterie nécessitent un support matériel fiable.
 History stores quota windows and opaque account scopes locally for 30 days. Disabling recording preserves saved history.|इतिहास में कोटा अवधि और अपारदर्शी खाता पहचान 30 दिन स्थानीय रहती हैं। रिकॉर्डिंग रोकने से पुराना इतिहास नहीं मिटता।|El historial guarda cuotas e identificadores opacos locales durante 30 días. Desactivar el registro conserva los datos guardados.|L’historique conserve localement les quotas et des identifiants opaques pendant 30 jours. Désactiver l’enregistrement conserve les données.
 Capacity|क्षमता|Capacidad|Capacité
 Captured: {0}|रीडिंग का समय: {0}|Capturado: {0}|Relevé : {0}

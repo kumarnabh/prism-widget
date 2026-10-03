@@ -13,6 +13,8 @@
 ## Features
 
 - CPU/RAM usage, free system-drive space, download/upload rate and short history charts.
+- Optional GPU percentage, dedicated VRAM, Windows-reported CPU frequency, battery and disk throughput. Multi-GPU and local-disk details live in **⋯ → System capacity**.
+- Minimize to a taskbar button with live capacity bars in its hover/Peek preview, or use **⋯ → Taskbar ribbon** for a persistent compact view near the taskbar.
 - Automatic Codex, Cursor Individual, OpenCode Go and Claude subscription quota adapters.
 - Resizable dashboard, compact grid and slim ribbon. Labels disappear before metrics; the widget never scrolls.
 - Two optional global timezone clocks with daylight saving, date rollover and UTC-offset tooltips. Defaults: US Eastern and US Pacific.
@@ -25,6 +27,7 @@
 - Local window-level allowance history, cautious burn-rate estimates, safe pace and an upcoming-reset timeline.
 - A cached tray capacity view and optional predictive alerts; no model calls or cloud analytics.
 - Hide/reorder metrics, adjust opacity and save Work, Gaming, Presentation or custom layout profiles.
+- Show/hide every metric, including an empty layout, and optionally show only AI providers with valid quota windows. Stale readings retain their state; this filter does not verify paid entitlement.
 - Screen-edge snapping and monitor-aware position restoration.
 - English, Hindi, Spanish and French core interface, with 12/24-hour clocks.
 - On-demand update checks and size/SHA-256-verified ZIP downloads from this repository.

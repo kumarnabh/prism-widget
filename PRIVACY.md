@@ -4,7 +4,8 @@ Prism runs locally. There is no Prism server, analytics, crash upload or automat
 
 | Component | Reads | Destination |
 | --- | --- | --- |
-| System metrics | Windows CPU, memory, drive and adapter counters | Widget memory; local self-tests include sensor values |
+| System metrics | Windows CPU, memory, GPU/VRAM, battery, frequency, drive and network counters | Widget memory and cached taskbar preview; local self-tests include sensor values |
+| Optional resource consumers | Process names, PID/start time, current CPU and RAM | Secondary view only, in memory; no command lines, persistence or upload |
 | Codex | Current CLI quota; local credential-file bytes only for an opaque history scope; historical quota events as stale fallback | Provider through its own CLI; no credential bytes persisted or sent by history code |
 | Cursor / Go | Existing local sign-in after opt-in | Credential to its own fixed HTTPS usage endpoint; quota cache and credential fingerprint locally |
 | Claude CLI | Authentication status and built-in usage panel | Claude manages its connection; normalized quota/account fingerprint cached locally |
