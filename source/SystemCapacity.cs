@@ -15,7 +15,7 @@ public sealed record SystemMetric(string Id,string Label,double? Value,string Un
 }
 public sealed record GpuAdapter(string Id,string Name,ulong DedicatedBytes);
 public sealed record DiskCapacity(string Name,long Free,long Total,DateTimeOffset At=default);
-public sealed record HardwareSnapshot(SystemMetric[] Metrics,GpuAdapter[] Adapters,DiskCapacity[] Disks,DateTimeOffset At,double SampleMilliseconds)
+public sealed record HardwareSnapshot(SystemMetric[] Metrics,GpuAdapter[] Adapters,DiskCapacity[] Disks,DateTimeOffset At,double SampleMilliseconds,bool? BatteryPresent=null)
 {
     public static readonly HardwareSnapshot Empty=new(Array.Empty<SystemMetric>(),Array.Empty<GpuAdapter>(),Array.Empty<DiskCapacity>(),DateTimeOffset.MinValue,0);
 }
@@ -30,6 +30,7 @@ public sealed class SystemCapacity:IDisposable
     {
         PdhCounters? counters=null;DateTimeOffset slowAt=default,inventoryAt=default,powerAt=default,retryAt=default;
         var adapters=Array.Empty<GpuAdapter>();var disks=Array.Empty<DiskCapacity>();var slow=new List<SystemMetric>();var powerMetrics=new List<SystemMetric>();
+        bool? batteryPresent=null;
         try{while(!stop.IsCancellationRequested){
             var watch=Stopwatch.StartNew();var now=DateTimeOffset.UtcNow;var metrics=new List<SystemMetric>();
             metrics.AddRange(Basic(now));
@@ -62,8 +63,8 @@ public sealed class SystemCapacity:IDisposable
             }
             metrics.AddRange(slow);
             if(now-powerAt>=TimeSpan.FromSeconds(10)){
-            powerAt=now;powerMetrics.Clear();
-            try{if(GetSystemPowerStatus(out var power))powerMetrics.AddRange(Battery(power,now));else powerMetrics.Add(new("battery","Battery",null,"%",null,now,"Unavailable"));}catch{}
+            powerAt=now;powerMetrics.Clear();batteryPresent=null;
+            try{if(GetSystemPowerStatus(out var power)){batteryPresent=power.Flags==255?null:(power.Flags&128)==0;powerMetrics.AddRange(Battery(power,now));}else powerMetrics.Add(new("battery","Battery",null,"%",null,now,"Unavailable"));}catch{powerMetrics.Add(new("battery","Battery",null,"%",null,now,"Unavailable"));}
             try{
                 int size=Marshal.SizeOf<ProcessorPower>();var buffer=Marshal.AllocHGlobal(size*Environment.ProcessorCount);
                 try{if(CallNtPowerInformation(11,IntPtr.Zero,0,buffer,(uint)(size*Environment.ProcessorCount))==0){var frequencies=Enumerable.Range(0,Environment.ProcessorCount).Select(i=>Marshal.PtrToStructure<ProcessorPower>(buffer+i*size).CurrentMhz).Where(v=>v>0&&v<20000).ToArray();if(frequencies.Length>0)powerMetrics.Add(new("frequency","CPU frequency",frequencies.Average(v=>(double)v)/1000," GHz",null,now,Details:"Windows-reported clock; not instantaneous turbo frequency"));}}finally{Marshal.FreeHGlobal(buffer);}
@@ -71,7 +72,7 @@ public sealed class SystemCapacity:IDisposable
             if(!powerMetrics.Any(m=>m.Id=="frequency"))powerMetrics.Add(new("frequency","CPU frequency",null," GHz",null,now,"Unavailable"));
             }
             metrics.AddRange(powerMetrics);
-            Volatile.Write(ref latest,new(metrics.ToArray(),adapters,disks,now,watch.Elapsed.TotalMilliseconds));
+            Volatile.Write(ref latest,new(metrics.ToArray(),adapters,disks,now,watch.Elapsed.TotalMilliseconds,batteryPresent));
             await Task.Delay(2000,stop.Token);
         }}catch(OperationCanceledException){}finally{counters?.Dispose();}
     }

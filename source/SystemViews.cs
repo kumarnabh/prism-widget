@@ -122,6 +122,8 @@ public sealed partial class Widget
                 if(language=="en"&&visible.Length==WidgetPreferences.MetricIds.Length)SavePreview($"preview-system-grid-{(int)size.Item1}x{(int)size.Item2}.png",2);
             }
         }
+        preferences.VisibleMetrics=new(){"battery"};hardwareFixture=hardwareFixture with{BatteryPresent=false};if(MetricVisible("battery"))throw new InvalidOperationException("Desktop omits battery metric");
+        hardwareFixture=hardwareFixture with{BatteryPresent=null};if(!MetricVisible("battery"))throw new InvalidOperationException("Unknown battery remains available as unknown");
         var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);providerData.Clear();preferences.ActiveProvidersOnly=true;preferences.VisibleMetrics=new(){"codex","cursor","claude"};ApplyMetricPreferences();AdaptLayout();
         if(metricGrid.Children.Count!=0||emptyMetrics.Visibility!=Visibility.Visible)throw new InvalidOperationException("Active-only empty state");
         using(var fixture=System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(new{status="Live",at=DateTimeOffset.UtcNow.ToUnixTimeSeconds(),windows=new[]{new{label="Session",remaining=55d}}})))foreach(var id in preferences.VisibleMetrics)providerData[id]=fixture.RootElement.Clone();

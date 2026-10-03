@@ -24,10 +24,10 @@ public sealed partial class Widget
         if(!preview&&!selftest){history=UsageHistory.Load(File.Exists(HistoryPath)?HistoryPath:System.IO.Path.Combine(Data,"usage-history.json"),DateTimeOffset.UtcNow);notifications=LocalJson.Load<NotificationState>(System.IO.Path.Combine(Data,"notification-state.json"))??new();lowAlerts=LowQuotaAlerts.Load(System.IO.Path.Combine(Data,"low-alerts.json"));profiles=ProfileStore.Load(System.IO.Path.Combine(Data,"profiles.json"));}
         if(profiles.Items.Count==0){
             profiles.Items.Add(new("Work",442,858,false,true,1,WidgetPreferences.MetricIds.ToList(),WidgetPreferences.BaseMetricIds.ToList(),new(true)));
-            profiles.Items.Add(new("System capacity",620,350,true,true,1,WidgetPreferences.MetricIds.ToList(),new(){"cpu","gpu","vram","ram","disk","read","write","battery"},new()));
             profiles.Items.Add(new("Gaming",560,165,true,true,.9,WidgetPreferences.MetricIds.ToList(),new(){"cpu","ram","disk","net"},new()));
             profiles.Items.Add(new("Presentation",400,220,true,false,1,WidgetPreferences.MetricIds.ToList(),new(){"cpu","ram"},new()));
         }
+        if(profiles.Items.Count<20&&!profiles.Items.Any(p=>p.Name.Equals("System capacity",StringComparison.OrdinalIgnoreCase)))profiles.Items.Add(new("System capacity",620,350,true,true,1,WidgetPreferences.MetricIds.ToList(),new(){"cpu","gpu","vram","ram","disk","read","write","battery"},new()));
         SourceInitialized+=(_,_)=>{
             var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)!;
             string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Root.ToUpperInvariant())))[..16];
@@ -87,7 +87,12 @@ public sealed partial class Widget
         systems.Visibility=systemMetrics.Visibility==Visibility.Collapsed&&extras.Visibility==Visibility.Collapsed?Visibility.Collapsed:Visibility.Visible;
         sectionLabel.Visibility=providerGrid.Children.Count==0?Visibility.Collapsed:Visibility.Visible;
     }
-    bool MetricVisible(string id)=>preferences.VisibleMetrics.Contains(id)&&(!preferences.ActiveProvidersOnly||!WidgetPreferences.ProviderIds.Contains(id)||providerData.TryGetValue(id,out var data)&&QuotaSnapshot.Read(data,DateTimeOffset.UtcNow).Windows.Count>0);
+    bool MetricVisible(string id)
+    {
+        if(!preferences.VisibleMetrics.Contains(id))return false;var now=DateTimeOffset.UtcNow;var sample=Hardware;
+        if(id=="battery"&&sample.BatteryPresent==false&&now>=sample.At&&now-sample.At<=TimeSpan.FromSeconds(20))return false;
+        return !preferences.ActiveProvidersOnly||!WidgetPreferences.ProviderIds.Contains(id)||providerData.TryGetValue(id,out var data)&&QuotaSnapshot.Read(data,now).Windows.Count>0;
+    }
     void ReconcileMetricVisibility(){if(preferences.MetricOrder.Any(id=>metricTiles[id].Element.Visibility!=(MetricVisible(id)?Visibility.Visible:Visibility.Collapsed))){ApplyMetricPreferences();AdaptLayout();}}
     void RefreshDisplayedProviders()
     {
