@@ -8,7 +8,11 @@ $mode=if($LiveAccounts){'--selftest'}else{'--offline-selftest'}
 $process=Start-Process -FilePath $executable -ArgumentList $mode -WorkingDirectory $prismRoot -WindowStyle Hidden -PassThru
 if(-not $process.WaitForExit($TimeoutSeconds*1000)){
     $process.Kill()
-    throw 'Native self-test timed out.'
+    $fresh=@('selftest.json','preview-hd.png','preview-settings-fr.png','preview-capacity-fr.png','preview-history-fr.png','preview-tray-fr.png') | Where-Object {
+        $file=Join-Path $prismRoot $_
+        (Test-Path -LiteralPath $file) -and (Get-Item -LiteralPath $file).LastWriteTimeUtc -ge $started
+    }
+    throw "Native self-test timed out after $TimeoutSeconds seconds. Fresh fixed-name outputs: $($fresh -join ', ')."
 }
 if($process.ExitCode -ne 0){throw "Native self-test exited with code $($process.ExitCode)."}
 if(-not (Test-Path -LiteralPath $resultPath)){throw 'Native self-test did not produce results.'}
@@ -37,4 +41,4 @@ function Read-PngDimension([int]$offset){return [long]$png[$offset]*16777216+[lo
 $hdWidth=Read-PngDimension 16
 $hdHeight=Read-PngDimension 20
 if($result.hdLogicalWidth -le 0 -or $result.hdLogicalHeight -le 0 -or $hdWidth -ne [Math]::Ceiling($result.hdLogicalWidth*4) -or $hdHeight -ne [Math]::Ceiling($result.hdLogicalHeight*4)){throw 'HD preview does not match the 4x logical layout resolution.'}
-Write-Host "Native checks passed: sensors, controls, 16 layouts, 480 resize transitions, 160 customized layouts, isolated feature checks, and $hdWidth x $hdHeight HD export."
+Write-Host "Native checks passed in $([Math]::Round(([DateTime]::UtcNow-$started).TotalSeconds,1))s: sensors, controls, 16 layouts, 480 resize transitions, 160 customized layouts, isolated feature/forecast checks, and $hdWidth x $hdHeight HD export."

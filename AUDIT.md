@@ -2,6 +2,8 @@
 
 ## 1.9.0 capacity intelligence — 2026-10-03
 
+Hosted validation follow-up: the original PR passed both Python matrices, but a main-commit native job hit the 60-second harness deadline. Successful hosted native runs took 46 and 55 seconds with the expanded translated exports. CI now allows a bounded 120 seconds, preserving every functional/layout assertion and the local 60-second default. Timeout diagnostics report which fixed-name synthetic exports completed. The release stays gated on passing follow-up checks; no blind rerun or assertion removal was used.
+
 Local implementation review found and fixed: new scoped samples not triggering a save when their aggregate capture already existed; projections drifting as cached readings aged; chart projection starting at the wrong time; low/reset alert keys crossing accounts; Claude authentication changing during panel collection; frozen tray system values; and reentrant tray close exceptions. Diagnostic runs now exit nonzero on unhandled WPF exceptions instead of silently completing. New provider window IDs and duplicate-ID rejection keep histories distinct.
 
 Security review identified the Claude account-switch race; before/after authentication checks now discard mismatches. Codex similarly checks its local scope before/after collection. HMAC scope material stays local, no raw credentials enter history, fixed-host/no-redirect rules remain unchanged, and no dependency or service was added. Reset/low notification keys from 1.8 are conservatively honored during migration. Source/package scanning remains a separate publication gate.
