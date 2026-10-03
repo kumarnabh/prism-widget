@@ -418,7 +418,7 @@ public sealed partial class Widget : Window
     void UpdateSystem()
     {
         UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
-        ReadSystemSnapshot();ReconcileMetricVisibility();SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
+        ReadSystemSnapshot();ReconcileMetricVisibility();if(metricsOnly&&IsVisible&&WindowState==WindowState.Normal)SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
         // Values update while hidden/minimized; resize/density work runs on actual layout changes.
         if(IsVisible&&WindowState==WindowState.Normal){cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);}
     }
