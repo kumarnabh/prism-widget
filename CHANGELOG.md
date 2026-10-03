@@ -1,5 +1,16 @@
 # Change log
 
+## 1.9.0 — Capacity intelligence
+
+- Local account/window-scoped history and conservative burn-rate, sustainable pace, reset projection and exhaustion estimates.
+- Chronological reset details, limiting-window status and cached tray capacity view.
+- Opt-in predictive notifications with persistent deduplication and shared delivery cooldown.
+- Window history selection, gaps, reset markers and optional estimated trajectory.
+- English, Hindi, Spanish and French additions; estimates can be hidden entirely.
+- Preserve 1.8 aggregate history separately; future history schemas are read-only.
+- Fixed same-capture history persistence, account-switch collection races, capture-time projection drift, cross-account notification suppression and frozen tray values.
+- No new dependencies, endpoints, prompts, analytics or cloud storage.
+
 ## 1.8.0 — Your workspace, your way
 
 - Added system tray monitoring, background quota notifications and optional Windows startup.

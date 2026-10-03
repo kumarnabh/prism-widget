@@ -11,6 +11,8 @@ public sealed class WidgetPreferences
     public bool SnapEdges {get;set;}=true;
     public bool HistoryEnabled {get;set;}=true;
     public bool LowQuotaEnabled {get;set;}=true;
+    public bool ForecastEnabled {get;set;}=true;
+    public bool CapacityAlerts {get;set;}=false;
     public int LowQuotaThreshold {get;set;}=20;
     public bool Use24Hour {get;set;}=true;
     public string Language {get;set;}="en";

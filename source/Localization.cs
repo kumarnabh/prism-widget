@@ -27,6 +27,40 @@ public static class L
         if(Application.Current is not null)foreach(var key in Words.Keys)Application.Current.Resources["t."+key]=T(key);
     }
     const string Data="""
+History stores quota windows and opaque account scopes locally for 30 days. Disabling recording preserves saved history.|इतिहास में कोटा अवधि और अपारदर्शी खाता पहचान 30 दिन स्थानीय रहती हैं। रिकॉर्डिंग रोकने से पुराना इतिहास नहीं मिटता।|El historial guarda cuotas e identificadores opacos locales durante 30 días. Desactivar el registro conserva los datos guardados.|L’historique conserve localement les quotas et des identifiants opaques pendant 30 jours. Désactiver l’enregistrement conserve les données.
+Capacity|क्षमता|Capacidad|Capacité
+Captured: {0}|रीडिंग का समय: {0}|Capturado: {0}|Relevé : {0}
+Critical capacity|बहुत कम क्षमता|Capacidad crítica|Capacité critique
+Low capacity|कम क्षमता|Capacidad baja|Capacité faible
+{0:0.#} days|{0:0.#} दिन|{0:0.#} días|{0:0.#} jours
+{0:0.#} hours|{0:0.#} घंटे|{0:0.#} horas|{0:0.#} heures
+Capacity & resets|क्षमता और रीसेट|Capacidad y reinicios|Capacité et réinitialisations
+Next resets|अगले रीसेट|Próximos reinicios|Prochaines réinitialisations
+Provider readings and local estimates. Estimates are not guarantees.|प्रदाता की रीडिंग और स्थानीय अनुमान। अनुमान निश्चित नहीं हैं।|Datos del proveedor y estimaciones locales. No son garantías.|Relevés du fournisseur et estimations locales. Sans garantie.
+No current quota windows|कोई वर्तमान कोटा अवधि नहीं|Sin períodos de cuota actuales|Aucune période de quota actuelle
+Unknown reset|रीसेट अज्ञात|Reinicio desconocido|Réinitialisation inconnue
+Limiting window|सीमित करने वाली अवधि|Período limitante|Période limitante
+{0:0} minutes|{0:0} मिनट|{0:0} minutos|{0:0} minutes
+Stable estimate|स्थिर अनुमान|Estimación estable|Estimation stable
+Insufficient history|अपर्याप्त इतिहास|Historial insuficiente|Historique insuffisant
+Highly variable usage|उपयोग में अधिक बदलाव|Uso muy variable|Utilisation très variable
+Account scope unavailable|खाता पहचान उपलब्ध नहीं|Ámbito de cuenta no disponible|Périmètre du compte indisponible
+Rolling allowance|निरंतर बदलता कोटा|Cuota renovable|Quota glissant
+Reset imminent|रीसेट निकट है|Reinicio inminente|Réinitialisation imminente
+Recent pace: ~{0:0.#}% / hour|हाल की दर: ~{0:0.#}% / घंटा|Ritmo reciente: ~{0:0.#}% / hora|Rythme récent : ~{0:0.#}% / heure
+Safe pace: ~{0:0.#}% / hour|टिकाऊ दर: ~{0:0.#}% / घंटा|Ritmo sostenible: ~{0:0.#}% / hora|Rythme soutenable : ~{0:0.#}% / heure
+Projected at reset: ~{0:0.#}% remaining|रीसेट पर अनुमान: ~{0:0.#}% शेष|Proyección al reinicio: ~{0:0.#}% restante|Projection au renouvellement : ~{0:0.#}% restant
+Estimated exhaustion: {0}|समाप्ति का अनुमान: {0}|Agotamiento estimado: {0}|Épuisement estimé : {0}
+Capacity estimate|क्षमता का अनुमान|Estimación de capacidad|Estimation de capacité
+{0} may exhaust before reset at the recent pace.|हाल की दर पर {0} रीसेट से पहले समाप्त हो सकता है।|{0} podría agotarse antes del reinicio al ritmo reciente.|Au rythme récent, {0} pourrait s’épuiser avant le renouvellement.
+Show capacity estimates|क्षमता अनुमान दिखाएँ|Mostrar estimaciones|Afficher les estimations
+Enable predictive alerts|अनुमान आधारित अलर्ट सक्षम करें|Activar alertas predictivas|Activer les alertes prédictives
+Quota window|कोटा अवधि|Período de cuota|Période de quota
+Legacy aggregate|पुराना संयुक्त इतिहास|Historial agregado anterior|Ancien historique agrégé
+Show projected trajectory|अनुमानित रुझान दिखाएँ|Mostrar trayectoria estimada|Afficher la trajectoire estimée
+Estimate|अनुमान|Estimación|Estimation
+Current|वर्तमान|Actual|Actuel
+Reset|रीसेट|Reinicio|Réinitialisation
 Settings|सेटिंग्स|Ajustes|Réglages
 Connect this source to see its allowance.|कोटा देखने के लिए इस स्रोत से जुड़ें।|Conecte esta fuente para ver su cuota.|Connectez cette source pour voir son quota.
 No current quota window · waiting for a fresh reading|कोई ताज़ा कोटा नहीं · नई रीडिंग की प्रतीक्षा|Sin cuota actual · esperando datos nuevos|Aucun quota actuel · attente d’un nouveau relevé

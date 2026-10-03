@@ -20,6 +20,8 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | No reset alert | Needs running widget (visible or in tray), enabled reminders, fresh data, known reset in range, >10% left and a not-yet-notified reset. Preview only tests appearance. |
 | No tray notification | Check Windows notifications/Do Not Disturb and Settings → General → Enable system tray. The widget must remain running. |
 | Startup conflict | Disable Start with Windows in the old Prism installation first; registrations for another installation are preserved. |
+| No capacity estimate | Enable local history and estimates, then collect at least six fresh scoped samples over 30 minutes. Account/token changes, gaps, corrections and rolling replenishment restart or suppress the estimate. Browser/feed sources have no verified account scope. |
+| No predictive alert | Off by default; requires stable estimates on two captures five minutes apart, known reset, projected exhaustion at least 15 minutes early, and available notification delivery. Existing cooldown/deduplication may suppress it. |
 | Empty history | Fresh provider readings are needed while recording is enabled. Data is not backfilled. |
 | Update failed | Check connectivity to GitHub. Transfers time out after three minutes. A conflicting existing ZIP is preserved; move it before retrying. Never run a checksum-mismatched download. |
 | Hidden metric still alerts | Visibility controls the layout, not collection or alerts. Configure alerts separately. |

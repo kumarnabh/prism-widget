@@ -11,6 +11,7 @@ import sys
 import threading
 import time
 from quota_cache import valid_cache
+from history_scope import scope_id
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / 'data'
@@ -131,11 +132,22 @@ def collect():
         previous = cached['reading']
         if previous.get('windows') and now-previous.get('at', 0) >= 600:
             return {'status': 'Unavailable', 'detail': 'Claude CLI reading expired. Waiting for the next automatic check.'}
-        return previous
+        return {**previous,'scope':scope_id(DATA,'claude',identity)}
     try:
         reading = read_panel(exe)
     except Exception:
         reading = {'status': 'Unavailable', 'detail': 'Claude CLI terminal could not be read. Run Setup and check the Claude CLI connection.'}
+    # Authentication may change while the interactive panel is being collected.
+    # Never attach another account's quota to the scope captured before launch.
+    try:
+        after_proc = subprocess.run([exe, 'auth', 'status'], capture_output=True, text=True,
+                                    timeout=8, env=environment(), creationflags=0x08000000)
+        after = json.loads(after_proc.stdout)
+        after_identity = hashlib.sha256(json.dumps({k: after.get(k) for k in ('email','orgId','authMethod','subscriptionType')}, sort_keys=True).encode()).hexdigest() if isinstance(after,dict) and subscription_auth(after) else None
+    except Exception:
+        after_identity = None
+    if after_identity != identity:
+        return {'status': 'Unavailable', 'detail': 'Claude sign-in changed or could not be verified. Refresh after sign-in completes.'}
     old = cached.get('reading', {})
     # With no machine-readable reset timestamps, never carry old windows past ten minutes.
     if not reading.get('windows') and old.get('windows') and 0 <= now-old.get('at', 0) < 600:
@@ -143,7 +155,7 @@ def collect():
     tmp=path.with_name(f'claude-cli-{os.getpid()}-{time.time_ns()}.tmp')
     tmp.write_text(json.dumps({'identity': identity, 'checked': now, 'reading': reading}), encoding='utf-8')
     tmp.replace(path)
-    return reading
+    return {**reading,'scope':scope_id(DATA,'claude',identity)}
 
 
 def login():

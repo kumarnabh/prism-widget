@@ -1,6 +1,7 @@
 """Automatic account usage. Secrets are never returned, logged, cached or refreshed."""
 import base64, datetime, hashlib, json, os, pathlib, re, sqlite3, time, urllib.error, urllib.request
 from quota_cache import valid_cache
+from history_scope import scope_id
 
 ROOT=pathlib.Path(__file__).resolve().parent
 DATA=ROOT/'data'
@@ -36,7 +37,8 @@ def parse_go(data):
         used=w.get('percent')
         if not numeric(used) or not 0<=used<=100: raise UsageError('Go returned an invalid percentage.')
         value=usage_window(100 if w['status']=='rate-limited' else used,w.get('resetsAt'),label)
-        if value:windows.append(value)
+        if value:
+            value["id"]=key;value["rolling"]=key=="rolling";windows.append(value)
     if not windows:raise UsageError('Go returned no active quota windows.')
     return windows
 
@@ -48,10 +50,10 @@ def parse_cursor(data):
     # Explicit API percentage fields, not inferred token counts or API-rate costs.
     for key,label in [('totalPercentUsed','Included'),('autoPercentUsed','Cursor models'),('apiPercentUsed','Other models')]:
         value=usage_window(plan.get(key),reset,label)
-        if value: windows.append(value)
+        if value: windows.append({**value,'id':key})
     if not windows and numeric(plan.get('used')) and numeric(plan.get('limit')) and plan['limit']>0:
         value=usage_window(plan['used']/plan['limit']*100,reset,'Included')
-        if value:windows.append(value)
+        if value:windows.append({**value,'id':'totalPercentUsed'})
     if not windows:raise UsageError('Cursor returned no recognized included-usage balance. The dashboard format may have changed.')
     return windows
 
@@ -131,7 +133,7 @@ def collect_account(name):
                 active=[w for w in result['windows'] if w.get('reset') is None or w['reset']>time.time()]
                 if active:
                     fresh=0<=time.time()-result['at']<=600 and not cache.get('error')
-                    return {**result,'status':'Recent' if fresh else 'Stale','windows':active,'detail':cache.get('error','Last reading')}
+                    return {**result,'status':'Recent' if fresh else 'Stale','windows':active,'scope':scope_id(DATA,name,fingerprint),'detail':cache.get('error','Last reading')}
             return {'status':'Waiting','detail':cache.get('error','Next automatic check shortly.')}
         try:
             windows=parse(get_json(url,headers))
@@ -147,6 +149,7 @@ def collect_account(name):
                 reading={**cache['reading'],'status':'Stale','detail':message}
                 reading['windows']=[w for w in reading['windows'] if w.get('reset') is None or w['reset']>time.time()]
                 if not reading['windows']:reading={'status':'Unavailable','detail':message}
+        reading={**reading,'scope':scope_id(DATA,name,fingerprint)}
         DATA.mkdir(exist_ok=True);tmp=cache_path.with_name(cache_path.stem+f'-{os.getpid()}-{time.time_ns()}.tmp');tmp.write_text(json.dumps(cache));tmp.replace(cache_path)
         return reading
     except UsageError as exc:return {'status':'Connect','detail':str(exc)}

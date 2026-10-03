@@ -3,9 +3,10 @@ using System.Text.Json;
 
 namespace Prism;
 
-public sealed record ResetNotice(string Provider,string Window,double Remaining,DateTimeOffset Reset)
+public sealed record ResetNotice(string Provider,string Window,double Remaining,DateTimeOffset Reset,string Scope="",string WindowId="")
 {
-    public string Key=>JsonSerializer.Serialize(new[]{Provider,Window,Reset.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture)});
+    public string LegacyKey=>JsonSerializer.Serialize(new[]{Provider,Window,Reset.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture)});
+    public string Key=>Scope.Length==64?JsonSerializer.Serialize(new[]{Provider,Scope,string.IsNullOrEmpty(WindowId)?Window:WindowId,Reset.ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture)}):LegacyKey;
     public string Message(DateTimeOffset now)=>$"{Provider} · {Window}: resets in {Math.Max(1,Math.Ceiling((Reset-now).TotalMinutes)):0}m · {Remaining:0.#}% left";
 }
 
@@ -31,12 +32,12 @@ public sealed class ResetReminders
             if(reading.Status is not ("Live" or "Recent" or "CLI" or "Browser" or "Feed"))continue;
             foreach(var window in reading.Windows){
                 if(!double.IsFinite(window.Remaining)||window.Remaining>100||window.Remaining<=10||window.Reset is not DateTimeOffset reset||reset<=now||reset-now>TimeSpan.FromMinutes(minutes))continue;
-                result.Add(new(provider,window.Label,window.Remaining,reset));
+                result.Add(new(provider,window.Label,window.Remaining,reset,reading.Scope,window.Id));
             }
         }
         return result.OrderBy(n=>n.Reset).ThenBy(n=>n.Provider).ToList();
     }
-    public List<ResetNotice> Unseen(IEnumerable<ResetNotice> notices)=>Enabled?notices.Where(n=>!Notified.ContainsKey(n.Key)).DistinctBy(n=>n.Key).ToList():new();
+    public List<ResetNotice> Unseen(IEnumerable<ResetNotice> notices)=>Enabled?notices.Where(n=>!Notified.ContainsKey(n.Key)&&!Notified.ContainsKey(n.LegacyKey)).DistinctBy(n=>n.Key).ToList():new();
     public void Mark(IEnumerable<ResetNotice> notices,DateTimeOffset now){foreach(var notice in notices)Notified[notice.Key]=notice.Reset.ToUnixTimeSeconds();Prune(now);}
     void Prune(DateTimeOffset now)=>Notified=Notified.Where(p=>p.Key.Length<=512&&p.Value>now.ToUnixTimeSeconds()&&p.Value<now.AddYears(1).ToUnixTimeSeconds()).Take(512).ToDictionary(p=>p.Key,p=>p.Value);
     public void Save(string path)

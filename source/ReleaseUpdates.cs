@@ -17,7 +17,7 @@ public sealed class ReleaseUpdates : IDisposable
     {
         operationTimeout=timeout??TimeSpan.FromMinutes(3);
         client=new(handler??new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromMinutes(3)};
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("PrismWidget/1.8.0");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("PrismWidget/1.9.0");
     }
     async Task<HttpResponseMessage> Get(Uri url,CancellationToken token)
     {
