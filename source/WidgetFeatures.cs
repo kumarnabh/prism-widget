@@ -23,10 +23,11 @@ public sealed partial class Widget
         Opacity=preferences.Opacity;ApplyMetricPreferences();
         if(!preview&&!selftest){history=UsageHistory.Load(File.Exists(HistoryPath)?HistoryPath:System.IO.Path.Combine(Data,"usage-history.json"),DateTimeOffset.UtcNow);notifications=LocalJson.Load<NotificationState>(System.IO.Path.Combine(Data,"notification-state.json"))??new();lowAlerts=LowQuotaAlerts.Load(System.IO.Path.Combine(Data,"low-alerts.json"));profiles=ProfileStore.Load(System.IO.Path.Combine(Data,"profiles.json"));}
         if(profiles.Items.Count==0){
-            profiles.Items.Add(new("Work",442,858,false,true,1,WidgetPreferences.MetricIds.ToList(),WidgetPreferences.MetricIds.ToList(),new(true)));
+            profiles.Items.Add(new("Work",442,858,false,true,1,WidgetPreferences.MetricIds.ToList(),WidgetPreferences.BaseMetricIds.ToList(),new(true)));
             profiles.Items.Add(new("Gaming",560,165,true,true,.9,WidgetPreferences.MetricIds.ToList(),new(){"cpu","ram","disk","net"},new()));
             profiles.Items.Add(new("Presentation",400,220,true,false,1,WidgetPreferences.MetricIds.ToList(),new(){"cpu","ram"},new()));
         }
+        if(profiles.Items.Count<20&&!profiles.Items.Any(p=>p.Name.Equals("System capacity",StringComparison.OrdinalIgnoreCase)))profiles.Items.Add(new("System capacity",620,350,true,true,1,WidgetPreferences.MetricIds.ToList(),new(){"cpu","gpu","vram","ram","disk","read","write","battery"},new()));
         SourceInitialized+=(_,_)=>{
             var source=HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)!;
             string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Root.ToUpperInvariant())))[..16];
@@ -40,7 +41,8 @@ public sealed partial class Widget
         // Wait until WPF finishes its initial Show; hiding inside Loaded can be
         // overwritten by that pending visibility transition.
         Loaded+=(_,_)=>{if(!preview&&!selftest)Dispatcher.BeginInvoke(()=>{ConfigureTray();if(startInTray&&tray is not null)HideToTray();});};
-        StateChanged+=(_,_)=>{if(WindowState==WindowState.Minimized&&tray is not null)HideToTray();};
+        StateChanged+=(_,_)=>{if(WindowState==WindowState.Minimized&&tray is not null&&preferences.MinimizeToTray&&!taskbarMinimize)HideToTray();if(WindowState==WindowState.Normal)taskbarMinimize=false;};
+        SourceInitialized+=(_,_)=>InitializeTaskbar();
     }
     void ConfigureTray()
     {
@@ -48,13 +50,13 @@ public sealed partial class Widget
         if(tray is not null)return;
         try{tray=new TrayIcon(this,System.IO.Path.Combine(Root,"assets","prism.ico"),ShowTrayCapacity,ShowTrayMenu);}catch{tray=null;footer.Text=L.T("System tray is unavailable. Prism will stay visible.");}
     }
-    void ShowFromTray(){Show();WindowState=WindowState.Normal;Activate();}
+    void ShowFromTray(){Show();WindowState=WindowState.Normal;Activate();AdaptLayout();}
     void HideToTray(){if(tray is null)return;SavePosition();DismissReminder();Hide();}
     void ShowTrayMenu()
     {
         var menu=new ContextMenu();
         void AddItem(string name,Action action){var item=new MenuItem{Header=L.T(name)};item.Click+=(_,_)=>action();menu.Items.Add(item);}
-        AddItem("Capacity & resets",()=>{ShowFromTray();ShowCapacity();});AddItem("Show Prism",ShowFromTray);AddItem("Refresh",async()=>await UpdateProviders(true));
+        AddItem("Capacity & resets",()=>{ShowFromTray();ShowCapacity();});AddItem("System capacity",()=>{ShowFromTray();ShowSystemCapacity();});AddItem("Show Prism",ShowFromTray);AddItem("Refresh",async()=>await UpdateProviders(true));
         AddItem("Settings",()=>{ShowFromTray();ShowPreferences();});AddItem("Usage history",()=>{ShowFromTray();ShowHistory();});
         menu.Items.Add(new Separator());AddItem("Exit Prism",Close);menu.Placement=PlacementMode.MousePoint;menu.IsOpen=true;
     }
@@ -71,13 +73,13 @@ public sealed partial class Widget
     {
         preferences.Normalize();metricGrid.Children.Clear();providerGrid.Children.Clear();
         foreach(string id in preferences.MetricOrder){
-            bool visible=preferences.VisibleMetrics.Contains(id);metricTiles[id].Element.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
+            bool visible=MetricVisible(id);metricTiles[id].Element.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             if(visible)metricGrid.Children.Add(metricTiles[id].Element);
             if(cards.TryGetValue(id,out var card)){card.Element.Visibility=visible?Visibility.Visible:Visibility.Collapsed;if(visible)providerGrid.Children.Add(card.Element);}
         }
         void Pair(Grid grid,Dictionary<string,FrameworkElement> elements){
             grid.Children.Clear();foreach(var element in elements.Values){element.Visibility=Visibility.Collapsed;Grid.SetColumnSpan(element,1);}
-            var visible=preferences.MetricOrder.Where(id=>elements.ContainsKey(id)&&preferences.VisibleMetrics.Contains(id)).ToArray();
+            var visible=preferences.MetricOrder.Where(id=>elements.ContainsKey(id)&&MetricVisible(id)).ToArray();
             grid.Visibility=visible.Length==0?Visibility.Collapsed:Visibility.Visible;
             for(int i=0;i<visible.Length;i++){var element=elements[visible[i]];element.Visibility=Visibility.Visible;Add(grid,element,i*2);if(visible.Length==1)Grid.SetColumnSpan(element,3);}
         }
@@ -85,6 +87,13 @@ public sealed partial class Widget
         systems.Visibility=systemMetrics.Visibility==Visibility.Collapsed&&extras.Visibility==Visibility.Collapsed?Visibility.Collapsed:Visibility.Visible;
         sectionLabel.Visibility=providerGrid.Children.Count==0?Visibility.Collapsed:Visibility.Visible;
     }
+    bool MetricVisible(string id)
+    {
+        if(!preferences.VisibleMetrics.Contains(id))return false;var now=DateTimeOffset.UtcNow;var sample=Hardware;
+        if(id=="battery"&&sample.BatteryPresent==false&&now>=sample.At&&now-sample.At<=TimeSpan.FromSeconds(20))return false;
+        return !preferences.ActiveProvidersOnly||!WidgetPreferences.ProviderIds.Contains(id)||providerData.TryGetValue(id,out var data)&&QuotaSnapshot.Read(data,now).Windows.Count>0;
+    }
+    void ReconcileMetricVisibility(){if(preferences.MetricOrder.Any(id=>metricTiles[id].Element.Visibility!=(MetricVisible(id)?Visibility.Visible:Visibility.Collapsed))){ApplyMetricPreferences();AdaptLayout();}}
     void RefreshDisplayedProviders()
     {
         if(offline)return;var now=DateTimeOffset.UtcNow;latestReadings.Clear();RefreshForecasts();
@@ -131,6 +140,8 @@ public sealed partial class Widget
         StackPanel Tab(string name){var panel=new StackPanel{Margin=new Thickness(16)};tabs.Items.Add(new TabItem{Header=L.T(name),Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto}});return panel;}
         var general=Tab("General");
         var trayCheck=Check(general,"Enable system tray",preferences.TrayEnabled);var startup=Check(general,"Start with Windows",StartupRegistration.Enabled);var snap=Check(general,"Snap to screen edges",preferences.SnapEdges);var hours=Check(general,"Use 24-hour time",preferences.Use24Hour);
+        var minimizeCheck=Check(general,"Minimize to tray",preferences.MinimizeToTray);general.Children.Add(Button("Minimize to taskbar","Minimize to taskbar",()=>{dialog.Close();MinimizeToTaskbar();}));general.Children.Add(Button("Taskbar ribbon","Taskbar ribbon",()=>{dialog.Close();DockRibbon();}));
+        var taskbarIds=new[]{"none","cpu","ram","gpu","battery"}.Concat(WidgetPreferences.ProviderIds).ToArray();var taskbarNames=taskbarIds.Select(id=>L.T(id=="none"?"None":MetricName(id))).ToArray();var taskbarChoice=Choose(general,"Taskbar bar metric",taskbarNames,taskbarNames[Array.IndexOf(taskbarIds,preferences.TaskbarMetric)]);
         var languageNames=new[]{"English","हिन्दी","Español","Français"};var languageIds=new[]{"en","hi","es","fr"};var language=Choose(general,"Language",languageNames,languageNames[Array.IndexOf(languageIds,preferences.Language)]);
         general.Children.Add(Text("Opacity",12,Muted));var opacity=new Slider{Minimum=.65,Maximum=1,Value=preferences.Opacity,TickFrequency=.05,IsSnapToTickEnabled=true,Margin=new Thickness(0,8,0,16)};general.Children.Add(opacity);
         general.Children.Add(Button("Connections…","Connections…",()=>{dialog.Close();ShowConnection("cursor","Cursor");}));general.Children.Add(Button("World clocks…","World clocks…",()=>{dialog.Close();ShowClocks();}));
@@ -139,9 +150,11 @@ public sealed partial class Widget
         var intervals=new[]{60,300,600,900,1800,3600};var rateBoxes=new Dictionary<string,ComboBox>();
         foreach(string id in WidgetPreferences.ProviderIds){var box=Choose(rates,ProviderName(id),intervals.Cast<object>(),preferences.RefreshSeconds[id]);box.ItemStringFormat="{0} s";rateBoxes[id]=box;}
         var metrics=Tab("Metrics");metrics.Children.Add(Text("Choose visible metrics and their order. The compact grid uses the full order; the dashboard keeps paired system groups and orders AI cards.",12,Muted));
+        var activeOnly=Check(metrics,"Only active AI subscriptions",preferences.ActiveProvidersOnly);metrics.Children.Add(Text("Active means a provider has quota windows. Prism cannot verify paid subscription entitlement. Stale readings remain marked stale.",11,Muted));
         var ordered=preferences.MetricOrder.ToList();var enabled=preferences.VisibleMetrics.ToHashSet();var list=new ListBox{Height=275,Margin=new Thickness(0,12,0,12),Background=Brush("#1C2D43"),Foreground=new SolidColorBrush(Ink)};metrics.Children.Add(list);
         void RenderMetrics(string? selected=null){list.Items.Clear();foreach(var id in ordered){var box=new CheckBox{Content=L.T(MetricName(id)),IsChecked=enabled.Contains(id),Foreground=new SolidColorBrush(Ink),Padding=new Thickness(6),Tag=id};box.Checked+=(_,_)=>enabled.Add(id);box.Unchecked+=(_,_)=>enabled.Remove(id);list.Items.Add(box);if(id==selected)list.SelectedItem=box;}}
         RenderMetrics();var move=new StackPanel{Orientation=Orientation.Horizontal};
+        metrics.Children.Add(Button("Show all metrics","Show all metrics",()=>{foreach(var id in ordered)enabled.Add(id);RenderMetrics();}));metrics.Children.Add(Button("Hide all metrics","Hide all metrics",()=>{enabled.Clear();RenderMetrics();}));
         void Move(int delta){if(list.SelectedItem is not CheckBox item)return;string id=(string)item.Tag;int index=ordered.IndexOf(id),target=index+delta;if(target<0||target>=ordered.Count)return;ordered.RemoveAt(index);ordered.Insert(target,id);RenderMetrics(id);}
         move.Children.Add(Button("Move up","Move up",()=>Move(-1)));move.Children.Add(Button("Move down","Move down",()=>Move(1)));metrics.Children.Add(move);
         var alerts=Tab("Alerts");var low=Check(alerts,"Enable low-quota alerts",preferences.LowQuotaEnabled);var threshold=Choose(alerts,"Remaining threshold (%)",new[]{5,10,15,20,25,30,40,50}.Cast<object>(),preferences.LowQuotaThreshold);
@@ -152,9 +165,10 @@ public sealed partial class Widget
         var status=Text("",11,Muted);DockPanel.SetDock(status,Dock.Bottom);shell.Children.Insert(1,status);
         saveBar.Children.Add(Button("Cancel","Cancel",dialog.Close));
         saveBar.Children.Add(Button("Save","Save",()=>{
-            if(enabled.Count==0){status.Text=L.T("At least one metric is required.");return;}
             var next=preferences.Copy();next.TrayEnabled=trayCheck.IsChecked==true||startup.IsChecked==true;next.SnapEdges=snap.IsChecked==true;next.Use24Hour=hours.IsChecked==true;next.Language=languageIds[Math.Max(0,language.SelectedIndex)];next.Opacity=opacity.Value;
             next.ForecastEnabled=forecastCheck.IsChecked==true;next.CapacityAlerts=capacityCheck.IsChecked==true;next.LowQuotaEnabled=low.IsChecked==true;next.LowQuotaThreshold=threshold.SelectedItem is int value?value:20;next.HistoryEnabled=historyCheck.IsChecked==true;next.MetricOrder=ordered.ToList();next.VisibleMetrics=ordered.Where(enabled.Contains).ToList();
+            next.ActiveProvidersOnly=activeOnly.IsChecked==true;next.MinimizeToTray=minimizeCheck.IsChecked==true;
+            next.TaskbarMetric=taskbarIds[Math.Max(0,taskbarChoice.SelectedIndex)];
             foreach(var (id,box) in rateBoxes)next.RefreshSeconds[id]=box.SelectedItem is int seconds?seconds:(id=="codex"?60:300);
             try{
                 next.Save(SettingsPath);
@@ -171,7 +185,7 @@ public sealed partial class Widget
         };
         dialog.ShowDialog();
     }
-    static string MetricName(string id)=>id switch{"cpu"=>"CPU","ram"=>"Memory","disk"=>"Free disk","net"=>"Network",_=>ProviderName(id)};
+    static string MetricName(string id)=>id switch{"cpu"=>"CPU","ram"=>"Memory","disk"=>"Free disk","net"=>"Network","gpu"=>"GPU","vram"=>"Dedicated VRAM","frequency"=>"CPU frequency","battery"=>"Battery","read"=>"Disk read","write"=>"Disk write",_=>ProviderName(id)};
     void BuildProfileSettings(StackPanel panel,Window owner)
     {
         var choices=Choose(panel,"Profiles",profiles.Items.Select(p=>(object)p.Name),profiles.Items.FirstOrDefault()?.Name??"");var name=Input(panel,"Profile name","");name.MaxLength=32;var status=Text("",11,Muted);panel.Children.Add(status);

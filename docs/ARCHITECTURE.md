@@ -1,6 +1,6 @@
 # Architecture
 
-`App.cs` owns WPF, Windows sensors, adaptive layout and dialogs. System polling runs every two seconds. Provider collection uses a hidden Python subprocess for independently due providers on a five-second scheduler, with a 45-second deadline and cancellation on close. Single-instance identity is per installation.
+`App.cs` owns WPF, adaptive layout and dialogs. `SystemCapacity.cs` owns an independent background sensor worker and immutable normalized snapshots; the UI reads cached results every two seconds. Provider collection uses a hidden Python subprocess for independently due providers on a five-second scheduler, with a 45-second deadline and cancellation on close. Single-instance identity is per installation.
 
 `RuntimeSupport.cs` prefers `.venv/Scripts/python.exe`, with PATH fallback for older setups. Setup creates that isolated environment with pinned requirements. `doctor.py` checks dependencies without reading accounts or credentials.
 
@@ -16,6 +16,8 @@ Git ignores runtime state. A staged checker rejects private paths/patterns, and 
 
 
 ## Desktop customization
+
+`SystemViews.cs` composes advanced hardware/process details, active-provider display filtering, taskbar/ribbon actions and synthetic translated visual cases. `LiveTaskbarPreview.cs` renders cached values on native DWM callbacks with physical-client/requested-size bounds and deterministic GDI cleanup. Preview callbacks never collect sensors/providers. Sensor queries remain worker-owned through shutdown; cancellation never waits for an expensive native call on the UI thread. Repeated layout adaptation runs only on size/visibility changes, while cached values continue updating when hidden. `SystemCapacityChecks` covers freshness, missing hardware, engine aggregation, battery and process identity semantics. See SYSTEM-METRICS.md for source meanings, cadence and device qualification.
 
 `WidgetFeatures.cs` supplies settings/history windows and composes the feature services. `Preferences.cs` validates configuration, holds schedules and bounded profile storage, and writes JSON by same-directory atomic replacement. `UsageHistory.cs` filters fresh samples, compacts five-minute buckets, keeps 30 days and persists alert deduplication. `HistoryChart.cs` renders time-based allowance lines with explicit gaps.
 

@@ -24,7 +24,7 @@ foreach($folder in @('browser-extension','assets','docs\legal')){
     $allowed=if($folder -eq 'assets'){@('prism.ico','prism-icon.png','icon-prompt.txt')}elseif($folder -eq 'browser-extension'){@('manifest.json','background.js','popup.html','popup.js')}else{@('dotnet-LICENSE.txt','dotnet-THIRD-PARTY-NOTICES.txt','wpf-LICENSE.txt','wpf-THIRD-PARTY-NOTICES.txt')}
     foreach($name in $allowed){Copy-Item -LiteralPath (Join-Path (Join-Path $prismRoot $folder) $name) -Destination $destination}
 }
-foreach($name in @('ARCHITECTURE.md','RELEASING.md','FORECASTING.md')){Copy-Item -LiteralPath (Join-Path $prismRoot "docs\$name") -Destination (Join-Path $stage 'docs')}
+foreach($name in @('ARCHITECTURE.md','RELEASING.md','FORECASTING.md','SYSTEM-METRICS.md')){Copy-Item -LiteralPath (Join-Path $prismRoot "docs\$name") -Destination (Join-Path $stage 'docs')}
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $archive=Join-Path $OutputDirectory "Prism-$version-win-x64.zip"
 if(Test-Path -LiteralPath $archive){throw 'Release archive already exists; choose a new output directory to preserve it.'}

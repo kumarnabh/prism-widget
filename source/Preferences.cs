@@ -5,7 +5,9 @@ namespace Prism;
 
 public sealed class WidgetPreferences
 {
-    public static readonly string[] MetricIds={"cpu","ram","disk","net","codex","cursor","opencode","claude"};
+    public static readonly string[] BaseMetricIds={"cpu","ram","disk","net","codex","cursor","opencode","claude"};
+    public static readonly string[] ExtraMetricIds={"gpu","vram","frequency","battery","read","write"};
+    public static readonly string[] MetricIds=BaseMetricIds.Concat(ExtraMetricIds).ToArray();
     public static readonly string[] ProviderIds={"codex","cursor","opencode","claude"};
     public bool TrayEnabled {get;set;}=true;
     public bool SnapEdges {get;set;}=true;
@@ -13,21 +15,24 @@ public sealed class WidgetPreferences
     public bool LowQuotaEnabled {get;set;}=true;
     public bool ForecastEnabled {get;set;}=true;
     public bool CapacityAlerts {get;set;}=false;
+    public bool ActiveProvidersOnly {get;set;}=false;
+    public bool MinimizeToTray {get;set;}=true;
+    public string TaskbarMetric {get;set;}="ram";
     public int LowQuotaThreshold {get;set;}=20;
     public bool Use24Hour {get;set;}=true;
     public string Language {get;set;}="en";
     public double Opacity {get;set;}=1;
     public List<string> MetricOrder {get;set;}=MetricIds.ToList();
-    public List<string> VisibleMetrics {get;set;}=MetricIds.ToList();
+    public List<string> VisibleMetrics {get;set;}=BaseMetricIds.ToList();
     public Dictionary<string,int> RefreshSeconds {get;set;}=new(){{"codex",60},{"cursor",300},{"opencode",300},{"claude",300}};
     public void Normalize()
     {
         if(!new[]{"en","hi","es","fr"}.Contains(Language))Language="en";
         if(!double.IsFinite(Opacity))Opacity=1;Opacity=Math.Clamp(Opacity,.65,1);
         LowQuotaThreshold=Math.Clamp(LowQuotaThreshold,1,50);
+        if(!new[]{"none","cpu","ram","gpu","battery"}.Concat(ProviderIds).Contains(TaskbarMetric))TaskbarMetric="none";
         MetricOrder=(MetricOrder??new()).Where(MetricIds.Contains).Distinct().Concat(MetricIds).Distinct().ToList();
         VisibleMetrics=(VisibleMetrics??new()).Where(MetricIds.Contains).Distinct().ToList();
-        if(VisibleMetrics.Count==0)VisibleMetrics.Add("cpu");
         RefreshSeconds??=new();
         RefreshSeconds=ProviderIds.ToDictionary(id=>id,id=>Math.Clamp(RefreshSeconds.GetValueOrDefault(id,id=="codex"?60:300),60,3600));
     }
