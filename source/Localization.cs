@@ -27,6 +27,23 @@ public static class L
         if(Application.Current is not null)foreach(var key in Words.Keys)Application.Current.Resources["t."+key]=T(key);
     }
     const string Data="""
+Providers|प्रदाता|Proveedores|Fournisseurs
+Connections and providers|कनेक्शन और प्रदाता|Conexiones y proveedores|Connexions et fournisseurs
+Read-only sources. Authentication stays with your provider.|केवल पढ़ने वाले स्रोत। साइन-इन प्रदाता संभालता है।|Fuentes de solo lectura. Su proveedor gestiona el acceso.|Sources en lecture seule. Le fournisseur gère la connexion.
+Disabled|बंद|Desactivado|Désactivé
+Disable provider|प्रदाता बंद करें|Desactivar proveedor|Désactiver le fournisseur
+Enable provider|प्रदाता चालू करें|Activar proveedor|Activer le fournisseur
+Enable or disable collection|रीडिंग चालू या बंद करें|Activar o desactivar lecturas|Activer ou désactiver la collecte
+Last successful update: {0}|अंतिम सफल अपडेट: {0}|Última actualización correcta: {0}|Dernière mise à jour réussie : {0}
+Every {0} seconds|हर {0} सेकंड|Cada {0} segundos|Toutes les {0} secondes
+Remaining allowance|शेष सीमा|Cuota restante|Quota restant
+Reset time|रीसेट समय|Hora de reinicio|Heure de réinitialisation
+Multiple windows|कई कोटा अवधि|Varias ventanas|Plusieurs fenêtres
+Local CLI|स्थानीय CLI|CLI local|CLI locale
+API credits|API क्रेडिट|Créditos API|Crédits API
+Allow existing OpenRouter environment sign-in|मौजूदा OpenRouter साइन-इन की अनुमति दें|Permitir la clave existente de OpenRouter|Autoriser la clé OpenRouter existante
+Could not save settings. Check folder access.|सेटिंग्स सहेज नहीं पाए। फ़ोल्डर की पहुँच जाँचें।|No se pudieron guardar los ajustes. Revise el acceso a la carpeta.|Impossible d’enregistrer. Vérifiez l’accès au dossier.
+No prompts, identities or machine information are sent to Prism servers. There are no Prism servers.|Prism का कोई सर्वर नहीं है। प्रॉम्प्ट, पहचान या कंप्यूटर की जानकारी नहीं भेजी जाती।|Prism no tiene servidores. No se envían solicitudes, identidades ni datos del equipo.|Prism n’a pas de serveur. Aucun prompt, identité ou détail de l’appareil n’y est envoyé.
 System capacity|सिस्टम क्षमता|Capacidad del sistema|Capacité système
 GPU|GPU|GPU|GPU
 Dedicated VRAM|समर्पित VRAM|VRAM dedicada|VRAM dédiée
@@ -151,7 +168,7 @@ Exit Prism|Prism बंद करें|Salir de Prism|Quitter Prism
 Low quota|कम कोटा|Cuota baja|Quota faible
 Quota resets soon|कोटा जल्द रीसेट होगा|La cuota se restablece pronto|Réinitialisation du quota proche
 Next check: {0}|अगली जाँच: {0}|Próxima consulta: {0}|Prochaine vérification : {0}
-{0} of 4 sources current|4 में से {0} स्रोत ताज़ा|{0} de 4 fuentes al día|{0} sources sur 4 à jour
+{0} of {1} sources current|{1} में से {0} स्रोत ताज़ा|{0} de {1} fuentes al día|{0} sources sur {1} à jour
 Refresh failed; scheduled checks will retry.|रिफ्रेश विफल; निर्धारित जाँच पुनः प्रयास करेगी।|Actualización fallida; se reintentará.|Échec ; nouvelle tentative planifiée.
 Workspace pulse|कार्यस्थल की स्थिति|Estado del espacio|État de l’espace
 Live system health. AI capacity in view.|सिस्टम की स्थिति और AI क्षमता।|Estado del sistema y capacidad IA.|État du système et capacité IA.

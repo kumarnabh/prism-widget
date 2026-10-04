@@ -9,7 +9,7 @@ import providers as p
 class QuotaTests(unittest.TestCase):
     def test_selected_provider_does_not_poll_other_accounts(self):
         with patch.object(p,'codex',return_value={'status':'Live'}) as codex, patch.object(p,'claude') as claude, patch.object(p.auto_sources,'collect_account') as accounts:
-            self.assertEqual(p.collect(['codex']),{'codex':{'status':'Live'}})
+            result=p.collect(['codex']);self.assertEqual(set(result),{'codex'});self.assertEqual(result['codex']['provider_id'],'codex');self.assertEqual(result['codex']['windows'],[]);self.assertEqual(result['codex']['status'],'Unavailable')
             codex.assert_called_once();claude.assert_not_called();accounts.assert_not_called()
     def test_invalid_or_empty_selection(self):
         with patch.object(p,'codex') as codex, patch.object(p,'claude') as claude, patch.object(p.auto_sources,'collect_account') as accounts:

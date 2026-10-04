@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "providers": [
+    {"id":"codex","name":"Codex","icon":"⌘","color":"#6AF5E2","adapter":"codex","source":"Codex CLI / local telemetry","authentication":"Provider CLI sign-in","interval":60,"enabled":true,"capabilities":["remaining","reset","multiple_windows","history","local_cli"]},
+    {"id":"cursor","name":"Cursor","icon":"↗","color":"#A9D2FF","adapter":"cursor","source":"Cursor Individual account usage","authentication":"Existing Cursor sign-in, opt-in","interval":300,"enabled":true,"capabilities":["remaining","reset","multiple_windows","history"]},
+    {"id":"opencode","name":"OpenCode Go","icon":"▣","color":"#C2ADFF","adapter":"opencode","source":"OpenCode Go account usage","authentication":"Existing OpenCode Go sign-in, opt-in","interval":300,"enabled":true,"capabilities":["remaining","reset","multiple_windows","history"]},
+    {"id":"claude","name":"Claude","icon":"✳","color":"#FFC39F","adapter":"claude","source":"Claude subscription CLI / optional local feed","authentication":"Claude subscription sign-in","interval":300,"enabled":true,"capabilities":["remaining","reset","multiple_windows","history","local_cli"]},
+    {"id":"openrouter","name":"OpenRouter","icon":"◇","color":"#B9C7FF","adapter":"openrouter","source":"OpenRouter key usage API","authentication":"Existing OPENROUTER_API_KEY environment, separate opt-in","interval":300,"enabled":false,"capabilities":["remaining","history","api_credits"]}
+  ]
+}

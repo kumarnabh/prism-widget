@@ -18,7 +18,7 @@ if($process.ExitCode -ne 0){throw "Native self-test exited with code $($process.
 if(-not (Test-Path -LiteralPath $resultPath)){throw 'Native self-test did not produce results.'}
 if((Get-Item -LiteralPath $resultPath).LastWriteTimeUtc -lt $started){throw 'Native self-test results are stale.'}
 $result=Get-Content -LiteralPath $resultPath -Raw | ConvertFrom-Json
-foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets','clocks','reminders','featureChecks','forecastChecks','systemChecks')){
+foreach($check in @('pin','compact','sensors','responsive','providers','quotaValidation','presets','clocks','reminders','featureChecks','forecastChecks','systemChecks','providerChecks')){
     if($result.$check -ne $true){throw "Native check failed: $check"}
 }
 if($result.layouts.Count -ne 16){throw 'Expected eight layouts with clocks both on and off.'}
@@ -35,6 +35,8 @@ foreach($layout in $result.customized){
 }
 if($result.systemLayouts.Count -ne 60){throw 'Expected 60 new system metric layout cases.'}
 foreach($layout in $result.systemLayouts){if(-not $layout.fits -or -not $layout.controls -or $layout.scale -lt 0.999){throw "System layout failed: $($layout.language), metrics=$($layout.metrics)"}}
+if($result.ecosystemLayouts.Count -ne 24){throw 'Expected 24 all-provider layout cases.'}
+foreach($layout in $result.ecosystemLayouts){if(-not $layout.fits -or -not $layout.controls -or -not $layout.selection -or $layout.scale -lt 0.999){throw "Provider layout failed: $($layout.language), $($layout.width)x$($layout.height)"}}
 $hdPath=Join-Path $prismRoot 'preview-hd.png'
 if(-not (Test-Path -LiteralPath $hdPath) -or (Get-Item -LiteralPath $hdPath).LastWriteTimeUtc -lt $started){throw 'HD preview missing or stale.'}
 $png=[IO.File]::ReadAllBytes($hdPath)

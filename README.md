@@ -10,12 +10,18 @@
 ![License: MIT](https://img.shields.io/badge/license-MIT-88dfd0)
 ![Platform: Windows x64](https://img.shields.io/badge/platform-Windows%20x64-a9d2ff)
 
+![Prism expanded glass dashboard with optional hardware and providers](assets/prism-dashboard.png)
+
+*Synthetic example. Metrics, visibility and providers are configurable; the main dashboard never scrolls.*
+
 ## Features
 
 - CPU/RAM usage, free system-drive space, download/upload rate and short history charts.
 - Optional GPU percentage, dedicated VRAM, Windows-reported CPU frequency, battery and disk throughput. Multi-GPU and local-disk details live in **⋯ → System capacity**.
 - Minimize to a taskbar button with live capacity bars in its hover/Peek preview, or use **⋯ → Taskbar ribbon** for a persistent compact view near the taskbar.
-- Automatic Codex, Cursor Individual, OpenCode Go and Claude subscription quota adapters.
+- Automatic Codex, Cursor Individual, OpenCode Go and Claude subscription quota adapters, plus optional OpenRouter key-credit allowance.
+- A reviewed provider registry, individual collection/timeout isolation, and a Connections page with source, schedule, last update, enable/disable and setup guidance.
+- Expanded glass gauges and detailed cards stay available with GPU/hardware metrics enabled. Short layouts adapt to compact form when needed.
 - Resizable dashboard, compact grid and slim ribbon. Labels disappear before metrics; the widget never scrolls.
 - Two optional global timezone clocks with daylight saving, date rollover and UTC-offset tooltips. Defaults: US Eastern and US Pacific.
 - Quiet reset reminders when **more than 10% remains**, with configurable lead time and persistent deduplication.
@@ -53,17 +59,20 @@ The release includes .NET; no SDK or administrator access is needed. Executables
 | Codex | Install and sign in to Codex CLI | Active-account quota through its local app server; historical telemetry is only a stale fallback after connection failure. |
 | Cursor Individual | Sign in to Cursor; enable reuse in Prism | Read-only usage endpoint using the existing local sign-in. Team plans are unsupported. |
 | OpenCode Go | Configure Go in OpenCode; enable reuse | Read-only Go usage endpoint. A Zen/API key without Go entitlement is insufficient. |
+| OpenRouter | Enable separately in Connections; reuse an existing environment key after opt-in | Documented key credit limit/remaining; no raw key labels or guessed reset. |
 | Claude subscription | Install Claude Code; choose **Sign in to Claude** and complete first-run setup | Built-in interactive `/usage` panel every five minutes, with hooks/MCP disabled and no model prompt. |
 
 Cursor and Go credential reuse is opt-in. Prism never asks for pasted tokens, never refreshes raw credentials, and sends them only to their own fixed HTTPS usage endpoints, refusing redirects. Authentication is managed by each provider's app/CLI.
 
 Optional Claude browser sync and status-line feed setup is in the included [connection guide](README.html). Multiple browser accounts require an explicit choice. API-key Claude sessions do not provide subscription quota.
 
+OpenRouter is disabled by default. In Connections, enable it and separately allow reuse of your existing `OPENROUTER_API_KEY` environment value. Restart Prism after changing the environment. It reads only the documented key-usage endpoint: key credit allowance is not an account balance or token count. Unlimited keys and exact reset timestamps remain unknown. [Provider contract and contribution guide](docs/PROVIDERS.md).
+
 ## Readings and controls
 
 AI percentages show the **lowest remaining allowance among valid reported windows**: any window may limit use. Hover for all windows, source, capture time and known resets. A dash means unknown, never full. Status dots: green current, amber stale, pink error, gray unavailable. Capacity turns amber at 25% and coral at 10%.
 
-System readings update every two seconds. Default AI checks: Codex every 60 seconds; Cursor, OpenCode Go and Claude every five minutes. Settings → Refresh rates lets you choose 1/5/10/15/30/60 minutes per provider. A five-second scheduler launches only due adapters; hover a provider or the footer for its countdown. F5 requests all providers immediately but still respects provider caches and error backoff. Readings older than ten minutes are marked stale, even with a longer schedule. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
+System readings update every two seconds. Default AI checks: Codex every 60 seconds; Cursor, OpenCode Go, Claude and enabled OpenRouter every five minutes. Settings → Refresh rates lets you choose 1/5/10/15/30/60 minutes per provider. A five-second scheduler launches only due adapters; hover a provider or the footer for its countdown. F5 requests all enabled providers immediately but still respects provider caches and error backoff. Readings older than ten minutes are marked stale, even with a longer schedule. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
 
 Drag the title to move and the lower-right grip to resize. The top toolbar's vertical-arrow icon fits height to content; double-clicking the grip does the same. The icon is available in full and compact layouts. The **⋯** menu remains accessible at every size. Short layouts combine metrics into two, four or eight columns. Hover for labels and details.
 

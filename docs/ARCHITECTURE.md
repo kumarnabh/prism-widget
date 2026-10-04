@@ -1,6 +1,6 @@
 # Architecture
 
-`App.cs` owns WPF, adaptive layout and dialogs. `SystemCapacity.cs` owns an independent background sensor worker and immutable normalized snapshots; the UI reads cached results every two seconds. Provider collection uses a hidden Python subprocess for independently due providers on a five-second scheduler, with a 45-second deadline and cancellation on close. Single-instance identity is per installation.
+`App.cs` owns WPF, adaptive layout and dialogs. `SystemCapacity.cs` owns an independent background sensor worker and immutable normalized snapshots; the UI reads cached results every two seconds. Provider collection uses one hidden Python process per independently due provider on a five-second scheduler. Each tree has its own 45-second deadline and synchronous cancellation on close; each result updates the UI independently. Single-instance identity is per installation.
 
 `RuntimeSupport.cs` prefers `.venv/Scripts/python.exe`, with PATH fallback for older setups. Setup creates that isolated environment with pinned requirements. `doctor.py` checks dependencies without reading accounts or credentials.
 
@@ -34,3 +34,9 @@ Git ignores runtime state. A staged checker rejects private paths/patterns, and 
 `CapacityForecast.cs` is a pure local algorithm; see FORECASTING.md. The dashboard caches calculations for 30 seconds, refreshing on new readings. `CapacityViews.cs` composes secondary reset/tray views from normalized cached snapshots; opening them does not launch providers. Open views reevaluate freshness every 30 seconds. History charts break at gaps and replenishments and label projected lines as estimates.
 
 Existing reset/low alerts and opt-in predicted exhaustion share `NotificationState` delivery cooldown, with bounded persisted deduplication. Account-scoped keys use stable window IDs; legacy notification keys are conservatively honored during migration. Failed tray delivery is not marked delivered. Rapid-burn alerts are not implemented in 1.9. ForecastChecks covers deterministic time/correction/account/reset scenarios; native checks render all new views in four languages using synthetic account data.
+
+## Provider ecosystem (2.1)
+
+`provider-manifest.json` is reviewed package data read by Python and embedded in WPF. `ProviderCatalog` drives cards, choices, schedules and defaults. `provider_registry.py` owns explicit built-in dispatch and adapter lifecycle; `provider_contract.py` emits only versioned allowed fields. `ProviderRunner` bounds each worker output and lifetime; cancellation kills active trees even when the WPF dispatcher shuts down. Python never abandons CLI cleanup via daemon threads. `ProviderViews` exposes source/capability/schedule/state and individual enable/disable controls. Provider metadata has an opaque account slot but the UI still shows one active account per provider. See PROVIDERS.md for schema, credential rules and contribution fixtures.
+
+The expanded dashboard includes a separate optional hardware grid; selecting hardware no longer forces compact mode. When expanded content cannot fit, it falls back to the compact adaptive grid without downscaling type or adding dashboard scrolling. Tests preserve original layout cases and add all-five-provider coverage.

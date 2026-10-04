@@ -1,0 +1,7 @@
+{
+  "codex":{"rateLimits":{"primary":{"usedPercent":25,"windowDurationMins":300},"secondary":{"usedPercent":50,"windowDurationMins":10080}}},
+  "cursor":{"individualUsage":{"plan":{"totalPercentUsed":25,"autoPercentUsed":0,"apiPercentUsed":100}}},
+  "opencode":{"usage":{"rolling":{"status":"ok","percent":25},"weekly":{"status":"ok","percent":50},"monthly":{"status":"rate-limited","percent":100}}},
+  "claude":"Current session\n25% used\nCurrent week (all models)\n50% used\n",
+  "openrouter":{"data":{"limit":100,"limit_remaining":75,"limit_reset":"monthly","usage":25,"label":"DO NOT FORWARD","creator_user_id":"DO NOT FORWARD"}}
+}

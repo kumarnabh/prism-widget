@@ -7,8 +7,9 @@ public sealed class WidgetPreferences
 {
     public static readonly string[] BaseMetricIds={"cpu","ram","disk","net","codex","cursor","opencode","claude"};
     public static readonly string[] ExtraMetricIds={"gpu","vram","frequency","battery","read","write"};
-    public static readonly string[] MetricIds=BaseMetricIds.Concat(ExtraMetricIds).ToArray();
-    public static readonly string[] ProviderIds={"codex","cursor","opencode","claude"};
+    public static readonly string[] ProviderIds=ProviderCatalog.All.Select(p=>p.Id).ToArray();
+    public static readonly string[] MetricIds=BaseMetricIds.Concat(ProviderIds).Concat(ExtraMetricIds).Distinct().ToArray();
+    public List<string> DisabledProviders {get;set;}=ProviderCatalog.All.Where(p=>!p.Enabled).Select(p=>p.Id).ToList();
     public bool TrayEnabled {get;set;}=true;
     public bool SnapEdges {get;set;}=true;
     public bool HistoryEnabled {get;set;}=true;
@@ -24,7 +25,7 @@ public sealed class WidgetPreferences
     public double Opacity {get;set;}=1;
     public List<string> MetricOrder {get;set;}=MetricIds.ToList();
     public List<string> VisibleMetrics {get;set;}=BaseMetricIds.ToList();
-    public Dictionary<string,int> RefreshSeconds {get;set;}=new(){{"codex",60},{"cursor",300},{"opencode",300},{"claude",300}};
+    public Dictionary<string,int> RefreshSeconds {get;set;}=ProviderCatalog.All.ToDictionary(p=>p.Id,p=>p.Interval);
     public void Normalize()
     {
         if(!new[]{"en","hi","es","fr"}.Contains(Language))Language="en";
@@ -33,8 +34,9 @@ public sealed class WidgetPreferences
         if(!new[]{"none","cpu","ram","gpu","battery"}.Concat(ProviderIds).Contains(TaskbarMetric))TaskbarMetric="none";
         MetricOrder=(MetricOrder??new()).Where(MetricIds.Contains).Distinct().Concat(MetricIds).Distinct().ToList();
         VisibleMetrics=(VisibleMetrics??new()).Where(MetricIds.Contains).Distinct().ToList();
+        DisabledProviders=(DisabledProviders??new()).Where(ProviderIds.Contains).Distinct().ToList();
         RefreshSeconds??=new();
-        RefreshSeconds=ProviderIds.ToDictionary(id=>id,id=>Math.Clamp(RefreshSeconds.GetValueOrDefault(id,id=="codex"?60:300),60,3600));
+        RefreshSeconds=ProviderIds.ToDictionary(id=>id,id=>Math.Clamp(RefreshSeconds.GetValueOrDefault(id,ProviderCatalog.Get(id).Interval),60,3600));
     }
     public WidgetPreferences Copy()=>JsonSerializer.Deserialize<WidgetPreferences>(JsonSerializer.Serialize(this))!;
     public static WidgetPreferences Load(string path){var p=LocalJson.Load<WidgetPreferences>(path)??new();p.Normalize();return p;}
