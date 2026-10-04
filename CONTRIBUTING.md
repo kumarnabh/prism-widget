@@ -11,3 +11,5 @@ Pull requests should explain the user problem, changed behavior, checks and rema
 Stage only intended files, run `python scripts/check_publish.py`, inspect `git diff --cached`, and use Gitleaks per the release guide. Never force-add runtime data. CI must pass before merge. Report security vulnerabilities privately under SECURITY.md.
 
 Contributions are provided under this repository's MIT license. Third-party assets require provenance and compatible notices.
+
+For new quota sources, start with the [provider SDK and fixture checklist](docs/PROVIDERS.md). Providers enter reviewed source/build releases; no arbitrary Internet plugin loading is supported.

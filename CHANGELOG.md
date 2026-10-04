@@ -1,5 +1,14 @@
 # Change log
 
+## 2.1.0 — Provider ecosystem and restored glass dashboard
+
+- Restored expanded gauges/provider cards when extra hardware is selected; compact fallback is based on available space. Fixed overlapping taskbar thumbnail titles.
+- Reviewed manifest and normalized provider contract shared across existing adapters; registry-driven cards, schedules, metrics and provider management.
+- Independent bounded provider processes, synchronous process-tree cancellation and stricter metadata/cache validation.
+- Optional OpenRouter key-credit allowance from its documented API, with separate environment-key consent and no inferred reset/account balance.
+- Preserved connection/error guidance for empty normalized quota results; consent settings now preserve unrelated provider choices.
+- Offline fixture coverage, native descendant cleanup checks, all-provider layouts and contributor SDK documentation. Gemini remains deferred pending a dependable headless interface.
+
 ## 2.0.0 — System capacity
 
 - Background normalized Windows sensor snapshots: GPU percentage, dedicated VRAM, CPU frequency, battery and disk activity, with secondary multi-GPU/disk details.

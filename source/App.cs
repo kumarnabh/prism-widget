@@ -86,10 +86,9 @@ public sealed partial class Widget : Window
     readonly UsageGauge cpuGauge=new("#6AF5E2"),ramGauge=new("#C2ADFF");
     readonly DispatcherTimer systemTimer=new(){Interval=TimeSpan.FromSeconds(2)}, providerTimer=new(){Interval=TimeSpan.FromSeconds(5)};
     readonly SystemCapacity hardware=new();
-    HardwareSnapshot? hardwareFixture;bool systemChecks;
+    HardwareSnapshot? hardwareFixture;bool systemChecks,providerChecks;
     bool busy,closed,compact;
     bool cpuReady,memoryReady,diskReady;
-    Process? collector;
     readonly System.Threading.CancellationTokenSource lifetime=new();
     readonly List<Button> refreshButtons=new();
     readonly bool preview,selftest,offline;
@@ -131,11 +130,11 @@ public sealed partial class Widget : Window
             UpdateSystem(); systemTimer.Start(); providerTimer.Start(); await UpdateProviders(true);
             if(preview || selftest) {
                 await System.Threading.Tasks.Task.Delay(5000); UpdateSystem();
-                if(selftest){systemChecks=SystemCapacityChecks.Verify();forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
+                if(selftest){providerChecks=await ProviderChecks.Verify();systemChecks=SystemCapacityChecks.Verify();forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
                 SavePreview(); Close();
             }
         };
-        Closed+=(_,_)=>{closed=true;DismissReminder();trayView?.Close();tray?.Dispose();taskbarPreview?.Dispose();hardware.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();StopCollector();if(!preview&&!selftest)SavePosition();};
+        Closed+=(_,_)=>{closed=true;DismissReminder();trayView?.Close();tray?.Dispose();taskbarPreview?.Dispose();hardware.Dispose(); systemTimer.Stop();providerTimer.Stop(); lifetime.Cancel();if(!preview&&!selftest)SavePosition();};
         KeyDown+=async (_,e)=>{
             if(e.Key==Key.F5){await UpdateProviders(true);e.Handled=true;}
             else if(Keyboard.Modifiers==ModifierKeys.Control&&e.Key==Key.P){SetPinned(!Topmost);e.Handled=true;}
@@ -213,7 +212,7 @@ public sealed partial class Widget : Window
             Item("Dashboard · 442 × 800","",()=>ApplyPreset(442,800));
             Item("Focus · 560 × 220","",()=>ApplyPreset(560,220));
             Item("Ribbon · 1200 × 120","",()=>ApplyPreset(1200,120));
-            menu.Items.Add(new Separator());Item("Free RAM","",ShowMemory);Item("Settings","Ctrl+,",ShowPreferences);Item("Connections…","",()=>ShowConnection("cursor","Cursor"));
+            menu.Items.Add(new Separator());Item("Free RAM","",ShowMemory);Item("Settings","Ctrl+,",ShowPreferences);Item("Connections…","",ShowProviders);
             Item("System capacity","",ShowSystemCapacity);Item("Minimize to taskbar","",MinimizeToTaskbar);Item("Taskbar ribbon","",DockRibbon);Item("Capacity & resets","",ShowCapacity);Item("Usage history","",ShowHistory);if(tray is not null)Item("Hide to tray","",HideToTray);
             Item("World clocks…","",ShowClocks);Item("Reset reminders…","",ShowResetReminders);
             Item("Diagnostics…","",async()=>await ShowDiagnostics());
@@ -268,7 +267,7 @@ public sealed partial class Widget : Window
         Add(worldClockRow,firstClock,0);Add(worldClockRow,secondClock,2);expandedBody.Children.Add(worldClockRow);
         systems=new StackPanel();expandedBody.Children.Add(systems);
         var metrics=Columns(-1,12,-1);systemMetrics=metrics;
-        var cpu=new StackPanel();cpu.Children.Add(Text("PROCESSOR",10,Muted));var cpuReadout=Columns(-1,48);Add(cpuReadout,cpuValue,0);Add(cpuReadout,cpuGauge,1);cpu.Children.Add(cpuReadout);cpu.Children.Add(Text($"{Environment.ProcessorCount} logical cores",11,Muted));cpuGraph=new Sparkline("#6AF5E2"){Height=44,Margin=new Thickness(0,9,0,0)};cpu.Children.Add(cpuGraph);
+        var cpu=new StackPanel();cpu.Children.Add(Text("PROCESSOR",10,Muted));var cpuReadout=Columns(-1,48);Add(cpuReadout,cpuValue,0);Add(cpuReadout,cpuGauge,1);cpu.Children.Add(cpuReadout);cpu.Children.Add(Text(selftest?"Example device":$"{Environment.ProcessorCount} logical cores",11,Muted));cpuGraph=new Sparkline("#6AF5E2"){Height=44,Margin=new Thickness(0,9,0,0)};cpu.Children.Add(cpuGraph);
         var ram=new StackPanel();ram.Children.Add(Text("MEMORY",10,Muted));var ramReadout=Columns(-1,48);Add(ramReadout,ramValue,0);Add(ramReadout,ramGauge,1);ram.Children.Add(ramReadout);ram.Children.Add(ramDetail);ramGraph=new Sparkline("#C2ADFF"){Height=44,Margin=new Thickness(0,9,0,0)};ram.Children.Add(ramGraph);
         cpuPanel=Panel(cpu);ramPanel=Panel(ram,"#80534379");Add(metrics,cpuPanel,0);Add(metrics,ramPanel,2);systems.Children.Add(metrics);
         extras=Columns(-1,18,-1);extras.Margin=new Thickness(0,14,0,18);
@@ -276,12 +275,13 @@ public sealed partial class Widget : Window
         var net=new StackPanel();netStack=net;net.Children.Add(Text("NETWORK · ↓ / ↑",9,Muted));netValue.Margin=new Thickness(0,5,0,0);net.Children.Add(netValue);networkNote=Text("Active physical adapters",9,Muted);net.Children.Add(networkNote);Add(extras,disk,0);Add(extras,net,2);systems.Children.Add(extras);
         section=Columns(-1,0);section.ColumnDefinitions[1].Width=GridLength.Auto;section.Margin=new Thickness(0,3,0,10);var label=Text("AI CAPACITY",10,Muted);sectionLabel=label;label.TextWrapping=TextWrapping.NoWrap;label.VerticalAlignment=VerticalAlignment.Center;Add(section,label,0);
         fullActions=CreateActions(false);Add(section,fullActions.Element,1);expandedBody.Children.Add(section);
-        foreach(var spec in new[]{("codex","Codex","⌘","#6AF5E2"),("cursor","Cursor","↗","#A9D2FF"),("opencode","OpenCode Go","▣","#C2ADFF"),("claude","Claude","✳","#FFC39F")})
+        foreach(var spec in ProviderCatalog.All.Select(p=>(p.Id,p.Name,p.Icon,p.Color)))
         {
             var card=new ProviderCard(spec.Item1,spec.Item2,spec.Item3,spec.Item4,()=>ShowConnection(spec.Item1,spec.Item2));
             cards[spec.Item1]=card;providerGrid.Children.Add(card.Element);
         }
         expandedBody.Children.Add(providerGrid);
+        expandedBody.Children.Insert(expandedBody.Children.IndexOf(section),expandedHardware);
         bottom=Columns(-1);bottom.Margin=new Thickness(0,10,0,0);footer.VerticalAlignment=VerticalAlignment.Center;Add(bottom,footer,0);expandedBody.Children.Add(bottom);
         hint=Text("System live · AI readings carry their own timestamp",9,Muted);hint.Margin=new Thickness(0,9,0,0);expandedBody.Children.Add(hint);
         body.Children.Add(expandedBody);
@@ -301,14 +301,14 @@ public sealed partial class Widget : Window
         actions.Children.Add(MenuButton());
         Add(metricHeader,actions,1);
         metricHeader.Margin=new Thickness(0,0,0,6);metricBody.Children.Add(metricHeader);
-        foreach(var spec in new[]{("cpu","CPU","▤","#6AF5E2"),("ram","Memory","▥","#C2ADFF"),("disk","Free disk","◴","#91C6FF"),("net","Network download / upload","↕","#9BCCD7"),("codex","Codex","⌘","#6AF5E2"),("cursor","Cursor","↗","#A9D2FF"),("opencode","OpenCode Go","▣","#C2ADFF"),("claude","Claude","✳","#FFC39F")}){
+        foreach(var spec in new[]{("cpu","CPU","▤","#6AF5E2"),("ram","Memory","▥","#C2ADFF"),("disk","Free disk","◴","#91C6FF"),("net","Network download / upload","↕","#9BCCD7")}.Concat(ProviderCatalog.All.Select(p=>(p.Id,p.Name,p.Icon,p.Color)))){
             var tile=new MetricTile(spec.Item2,spec.Item3,spec.Item4);metricTiles[spec.Item1]=tile;metricGrid.Children.Add(tile.Element);
             if(cards.ContainsKey(spec.Item1)){
                 tile.Element.Cursor=Cursors.Hand;tile.Element.MouseLeftButtonUp+=(_,_)=>ShowConnection(spec.Item1,spec.Item2);
                 tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowConnection(spec.Item1,spec.Item2);};
             }
         }
-        foreach(string id in WidgetPreferences.ExtraMetricIds){var tile=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");metricTiles[id]=tile;tile.Element.Cursor=Cursors.Hand;tile.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};}
+        foreach(string id in WidgetPreferences.ExtraMetricIds){var tile=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");metricTiles[id]=tile;var expanded=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");expandedHardwareTiles[id]=expanded;expanded.Element.Cursor=Cursors.Hand;expanded.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();expanded.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};tile.Element.Cursor=Cursors.Hand;tile.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};}
         metricBody.Children.Add(metricGrid);metricBody.Children.Add(emptyMetrics);
     }
     void SyncMetricValues()
@@ -320,9 +320,9 @@ public sealed partial class Widget : Window
         SyncHardwareTiles();
         foreach(var (key,card) in cards)metricTiles[key].Set(card.CompactValue,card.Element.ToolTip?.ToString()??key,card.Remaining,health:card.Health);
     }
-    void AdaptLayout()
+    void AdaptLayout(bool forceGrid=false)
     {
-        if(adapting||cards.Count!=4)return;adapting=true;
+        if(adapting||cards.Count!=ProviderCatalog.All.Length)return;adapting=true;
         try{
             double width=ActualWidth>0?ActualWidth:Width,height=ActualHeight>0?ActualHeight:Height;
             MinHeight=MinimumMetricHeight(width);
@@ -331,7 +331,7 @@ public sealed partial class Widget : Window
             narrowClocks=width<650;compactBrand.Visibility=clockPreferences.Enabled&&narrowClocks?Visibility.Collapsed:Visibility.Visible;
             UpdateClocks();
             metricPin.Content=Topmost?"◆":"◇";
-            metricsOnly=compact||height<640||metricGrid.Children.Count==0||preferences.VisibleMetrics.Any(WidgetPreferences.ExtraMetricIds.Contains);
+            metricsOnly=forceGrid||compact||height<640||metricGrid.Children.Count==0;
             expandedBody.Visibility=metricsOnly?Visibility.Collapsed:Visibility.Visible;
             metricBody.Visibility=metricsOnly?Visibility.Visible:Visibility.Collapsed;
             if(metricsOnly){
@@ -380,6 +380,9 @@ public sealed partial class Widget : Window
                 if(fullActions.Element.DesiredSize.Width+sectionLabel.DesiredSize.Width+8>availableWidth)fullActions.SetIconsOnly(true);
                 section.Margin=new Thickness(0,3,0,tight?4:10);
                 bottom.Margin=new Thickness(0,tight?3:10,0,0);
+                expandedHardware.Columns=availableWidth>=600?3:2;
+                foreach(var tile in expandedHardwareTiles.Values)tile.Arrange(availableWidth/expandedHardware.Columns,false,true,true);
+                SyncHardwareTiles();
                 foreach(var card in cards.Values)card.SetDensity(level,availableWidth/providerGrid.Columns);
                 body.Measure(new Size(availableWidth,double.PositiveInfinity));
                 if(dense&&!compact&&availableHeight-body.DesiredSize.Height>=80){
@@ -388,6 +391,7 @@ public sealed partial class Widget : Window
                 }
                 if(body.DesiredSize.Height<=availableHeight)break;
             }
+            if(body.DesiredSize.Height>height-22-frame.Padding.Top*2){adapting=false;AdaptLayout(true);return;}
             cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);
         }finally{adapting=false;}
     }
@@ -418,43 +422,24 @@ public sealed partial class Widget : Window
     void UpdateSystem()
     {
         UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
-        ReadSystemSnapshot();ReconcileMetricVisibility();if(metricsOnly&&IsVisible&&WindowState==WindowState.Normal)SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
+        ReadSystemSnapshot();ReconcileMetricVisibility();if(!metricsOnly&&IsVisible)SyncHardwareTiles();if(metricsOnly&&IsVisible&&WindowState==WindowState.Normal)SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
         // Values update while hidden/minimized; resize/density work runs on actual layout changes.
         if(IsVisible&&WindowState==WindowState.Normal){cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);}
     }
     static string Rate(double bytes)=>bytes>1048576?$"{bytes/1048576:0.0} MB/s":$"{bytes/1024:0} KB/s";
     static void Plot(List<double> history,Sparkline chart,double value){history.Add(value);if(history.Count>36)history.RemoveAt(0);chart.SetSamples(history);}
-    void StopCollector(){try{if(collector is {HasExited:false})collector.Kill(true);}catch(InvalidOperationException){}catch(System.ComponentModel.Win32Exception){}}
-    async System.Threading.Tasks.Task UpdateProviders(bool manual=false)
+    async Task UpdateProviders(bool manual=false)
     {
         if(offline){
-            using var fixture=JsonDocument.Parse("{\"codex\":{\"status\":\"Connect\"},\"cursor\":{\"status\":\"Connect\"},\"opencode\":{\"status\":\"Connect\"},\"claude\":{\"status\":\"Connect\"}}");
+            using var fixture=JsonDocument.Parse(JsonSerializer.Serialize(ProviderCatalog.All.ToDictionary(p=>p.Id,p=>new{status="Connect"})));
             providers=fixture.RootElement.Clone();foreach(var (key,card) in cards)card.Update(providers.GetProperty(key));
             footer.Text="Offline verification · no account access";AdaptLayout();return;
         }
-        if(busy||closed)return;
-        var due=schedule.Due(DateTimeOffset.UtcNow,manual);if(due.Length==0)return;
-        schedule.Mark(due,DateTimeOffset.UtcNow,preferences);busy=true;foreach(var button in refreshButtons)button.IsEnabled=false;footer.Text="●  "+L.T("Refresh");
-        try {
-            var start=new ProcessStartInfo{FileName=RuntimeSupport.Python(Root),WorkingDirectory=Root,UseShellExecute=false,CreateNoWindow=true,RedirectStandardOutput=true,RedirectStandardError=true};
-            start.ArgumentList.Add(System.IO.Path.Combine(Root,"providers.py"));
-            start.ArgumentList.Add("--providers");foreach(var id in due)start.ArgumentList.Add(id);
-            collector=Process.Start(start)!; var stdout=collector.StandardOutput.ReadToEndAsync();var stderr=collector.StandardError.ReadToEndAsync();
-            using var cts=System.Threading.CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);cts.CancelAfter(TimeSpan.FromSeconds(45));await collector.WaitForExitAsync(cts.Token);
-            if(closed)return;
-            var output=await stdout;await stderr;if(collector.ExitCode!=0)throw new Exception("Collector unavailable. Check Python installation.");
-            using var doc=JsonDocument.Parse(output);bool changed=false;var now=DateTimeOffset.UtcNow;
-            foreach(var key in due){
-                if(doc.RootElement.TryGetProperty(key,out var data)){providerData[key]=data.Clone();if(!preview&&!selftest&&preferences.HistoryEnabled)changed|=history.Record(key,QuotaSnapshot.Read(data,now),now);}
-                else providerData.Remove(key);
-            }
-            using(var merged=JsonDocument.Parse(JsonSerializer.Serialize(providerData)))providers=merged.RootElement.Clone();
-            if(changed)try{history.Save(HistoryPath);}catch(IOException){}catch(UnauthorizedAccessException){}
-            RefreshForecasts(true);RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
-        }catch(Exception){if(!closed){foreach(var key in due){providerData.Remove(key);latestReadings.Remove(ProviderName(key));cards[key].MarkOffline();}footer.Text=L.T("Refresh failed; scheduled checks will retry.");}StopCollector();}
-        finally{collector?.Dispose();collector=null;busy=false;if(!closed){foreach(var button in refreshButtons)button.IsEnabled=true;AdaptLayout();}}
+        if(closed)return;
+        var due=schedule.Due(DateTimeOffset.UtcNow,manual).Where(id=>!preferences.DisabledProviders.Contains(id)&&!collecting.Contains(id)).ToArray();
+        await Task.WhenAll(due.Select(UpdateProvider));
     }
-    static string ProviderName(string key)=>key switch{"codex"=>"Codex","cursor"=>"Cursor","claude"=>"Claude",_=>"OpenCode Go"};
+    static string ProviderName(string key)=>ProviderCatalog.All.FirstOrDefault(p=>p.Id==key)?.Name??key;
     void CheckResetReminders()
     {
         if(preview||selftest||closed||(!IsVisible&&tray is null)||!resetReminders.Enabled||reminderPopup.IsOpen)return;
@@ -563,6 +548,7 @@ public sealed partial class Widget : Window
     }
     void ShowConnection(string key,string name)
     {
+        if(key=="openrouter"){ShowOpenRouter();return;}
         var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
@@ -578,8 +564,13 @@ public sealed partial class Widget : Window
         stack.Children.Add(Text("Reuse the existing app sign-ins to read account quota. Requests go only to each provider's own usage endpoint. Prism never refreshes or saves your credentials.",12));
         bool enabled=false;try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"connections.json")));enabled=doc.RootElement.GetProperty("allowStoredCredentials").GetBoolean();}catch{}
         var consent=new CheckBox{Content="Allow my existing Cursor / OpenCode sign-ins",IsChecked=enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,14,0,12)};stack.Children.Add(consent);
+        var consentStatus=Text("",11,Muted);stack.Children.Add(consentStatus);
         stack.Children.Add(Button("Save connection preference","Enable or disable automatic authenticated quota reads",async()=>{
-            File.WriteAllText(System.IO.Path.Combine(Data,"connections.json"),JsonSerializer.Serialize(new{allowStoredCredentials=consent.IsChecked==true}));dialog.Close();await UpdateProviders(true);
+            try{
+                var connections=LocalJson.Load<Dictionary<string,bool>>(System.IO.Path.Combine(Data,"connections.json"))??new();connections["allowStoredCredentials"]=consent.IsChecked==true;LocalJson.Save(System.IO.Path.Combine(Data,"connections.json"),connections);
+                foreach(string id in new[]{"cursor","opencode"}){CancelProvider(id);providerData.Remove(id);latestReadings.Remove(ProviderName(id));cards[id].MarkOffline();}
+                schedule.Reset();RefreshDisplayedProviders();ReconcileMetricVisibility();dialog.Close();await UpdateProviders(true);
+            }catch(IOException){consentStatus.Text=L.T("Could not save settings. Check folder access.");}catch(UnauthorizedAccessException){consentStatus.Text=L.T("Could not save settings. Check folder access.");}
         }));
         var claudeTitle=Text("CLAUDE SUBSCRIPTION",11,Muted);claudeTitle.Margin=new Thickness(0,28,0,9);stack.Children.Add(claudeTitle);
         stack.Children.Add(Text("Prism reads Claude Code’s /usage panel every 5 minutes. Sign in with your Claude subscription and finish any first-run CLI setup. No browser extension or manual numbers are needed; Claude Code manages its own credentials.",12));
@@ -690,7 +681,7 @@ public sealed partial class Widget : Window
         foreach(var size in new[]{(340d,220d),(400d,430d),(560d,165d),(442d,600d),(442d,858d),(840d,260d),(840d,800d),(1200d,120d)}){
             Width=size.Item1;Height=size.Item2;UpdateLayout();AdaptLayout();UpdateLayout();
             var bounds=body.TransformToAncestor(this).TransformBounds(new Rect(0,0,body.ActualWidth,body.ActualHeight));
-            var all=metricsOnly?WidgetPreferences.BaseMetricIds.Select(id=>(FrameworkElement)metricTiles[id].Element).Concat(new FrameworkElement[]{metricHeader}):cards.Values.Select(c=>(FrameworkElement)c.Element).Concat(new FrameworkElement[]{fullHeader,cpuPanel,ramPanel,extras,section,bottom});
+            var all=metricsOnly?WidgetPreferences.BaseMetricIds.Select(id=>(FrameworkElement)metricTiles[id].Element).Concat(new FrameworkElement[]{metricHeader}):WidgetPreferences.BaseMetricIds.Where(cards.ContainsKey).Select(id=>(FrameworkElement)cards[id].Element).Concat(new FrameworkElement[]{fullHeader,cpuPanel,ramPanel,extras,section,bottom});
             all=all.Concat((metricsOnly?compactActions:fullActions).Buttons);
             if(showClocks)all=all.Concat(metricsOnly?new FrameworkElement[]{compactTimes}:new FrameworkElement[]{worldClockRow,firstTime,secondTime});
             bool visible=all.All(el=>{var box=el.TransformToAncestor(this).TransformBounds(new Rect(0,0,el.ActualWidth,el.ActualHeight));return el.IsVisible&&box.Left>=10&&box.Top>=10&&box.Right<=ActualWidth-9&&box.Bottom<=ActualHeight-9;});
@@ -726,9 +717,9 @@ public sealed partial class Widget : Window
                 }
             }
         }
-        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();VerifySystemViews();
+        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();VerifySystemViews();VerifyProviderViews();
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,systemChecks,systemLayouts,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,systemChecks,providerChecks,systemLayouts,ecosystemLayouts,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     (bool fits,bool controls,double scale) CheckLayout()
     {
@@ -832,7 +823,7 @@ public sealed partial class Widget : Window
                 var parts=reading.Windows.Select(w=>$"{w.Label} {w.Remaining:0.#}%").ToList();
                 string reset=reading.ResetSummary(now);if(reset.Length>0)parts.Add(reset);
                 detail.Text=string.Join(" · ",parts);
-            }else{value.Text="—";detail.Text=L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out _)?"No current quota window · waiting for a fresh reading":reading.Detail);}
+            }else{value.Text="—";detail.Text=L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out var reported)&&reported.ValueKind==JsonValueKind.Array&&reported.GetArrayLength()>0?"No current quota window · waiting for a fresh reading":reading.Detail);}
             Health=Remaining.HasValue?(state.Contains("Stale",StringComparison.OrdinalIgnoreCase)?"stale":"ready"):(state=="Connect"||state=="Waiting"?"unknown":"error");
             if(Health=="stale"){bar.Opacity=.4;detail.Text="Last reported · "+detail.Text;}
             var capacityColor=Remaining<=10?Brush("#F0A29A"):Remaining<=25?Brush("#E8C083"):accent;

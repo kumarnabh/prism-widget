@@ -82,7 +82,7 @@ public sealed partial class Widget
         var stack=new StackPanel{Margin=new Thickness(18)};window.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("PRISM",20));
         var system=Text("",16);stack.Children.Add(system);
         var list=new StackPanel();stack.Children.Add(list);
-        void Update(){system.Text="CPU "+cpuValue.Text+"  ·  "+L.T("Memory")+" "+ramValue.Text;list.Children.Clear();var now=DateTimeOffset.UtcNow;foreach(var id in WidgetPreferences.ProviderIds){
+        void Update(){system.Text="CPU "+cpuValue.Text+"  ·  "+L.T("Memory")+" "+ramValue.Text;list.Children.Clear();var now=DateTimeOffset.UtcNow;foreach(var id in WidgetPreferences.ProviderIds.Where(id=>!preferences.DisabledProviders.Contains(id))){
             var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;
             string value=reading?.Remaining is double remaining?$"{remaining:0.#}%":"—";
             string state=reading?.Status??"Unavailable";if(reading?.Remaining is not null&&UsageHistory.Fresh(reading,now))state=reading.Remaining<=10?"Critical capacity":reading.Remaining<=25?"Low capacity":state;

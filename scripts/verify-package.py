@@ -6,7 +6,7 @@ import zipfile
 FORBIDDEN = {'data', 'vendor', '.venv', '.git', '__pycache__', 'build', 'work', 'obj'}
 REQUIRED = {'Prism.exe', 'Prism.dll', 'coreclr.dll', 'Setup.cmd', 'Setup.ps1', 'doctor.py',
             'providers.py', 'auto_sources.py', 'claude_cli.py', 'quota_cache.py', 'history_scope.py',
-            'docs/FORECASTING.md', 'docs/SYSTEM-METRICS.md', 'requirements.txt', 'LICENSE', 'PRIVACY.md',
+            'provider_contract.py','provider_registry.py','provider-manifest.json','docs/PROVIDERS.md','assets/prism-dashboard.png','docs/FORECASTING.md', 'docs/SYSTEM-METRICS.md', 'requirements.txt', 'LICENSE', 'PRIVACY.md',
             'docs/legal/dotnet-LICENSE.txt', 'docs/legal/wpf-LICENSE.txt'}
 
 def check(archive):

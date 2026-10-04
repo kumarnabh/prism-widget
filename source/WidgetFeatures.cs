@@ -84,12 +84,14 @@ public sealed partial class Widget
             for(int i=0;i<visible.Length;i++){var element=elements[visible[i]];element.Visibility=Visibility.Visible;Add(grid,element,i*2);if(visible.Length==1)Grid.SetColumnSpan(element,3);}
         }
         Pair(systemMetrics,new(){{"cpu",cpuPanel},{"ram",ramPanel}});Pair(extras,new(){{"disk",diskStack},{"net",netStack}});
+        expandedHardware.Children.Clear();foreach(var id in preferences.MetricOrder.Where(id=>expandedHardwareTiles.ContainsKey(id)&&MetricVisible(id)))expandedHardware.Children.Add(expandedHardwareTiles[id].Element);
+        expandedHardware.Visibility=expandedHardware.Children.Count>0?Visibility.Visible:Visibility.Collapsed;
         systems.Visibility=systemMetrics.Visibility==Visibility.Collapsed&&extras.Visibility==Visibility.Collapsed?Visibility.Collapsed:Visibility.Visible;
         sectionLabel.Visibility=providerGrid.Children.Count==0?Visibility.Collapsed:Visibility.Visible;
     }
     bool MetricVisible(string id)
     {
-        if(!preferences.VisibleMetrics.Contains(id))return false;var now=DateTimeOffset.UtcNow;var sample=Hardware;
+        if(!preferences.VisibleMetrics.Contains(id)||preferences.DisabledProviders.Contains(id))return false;var now=DateTimeOffset.UtcNow;var sample=Hardware;
         if(id=="battery"&&sample.BatteryPresent==false&&now>=sample.At&&now-sample.At<=TimeSpan.FromSeconds(20))return false;
         return !preferences.ActiveProvidersOnly||!WidgetPreferences.ProviderIds.Contains(id)||providerData.TryGetValue(id,out var data)&&QuotaSnapshot.Read(data,now).Windows.Count>0;
     }
@@ -112,7 +114,8 @@ public sealed partial class Widget
             string forecastText=preferences.ForecastEnabled?string.Join("\n",forecasts.Where(p=>p.Key.StartsWith(id+"\u001f",StringComparison.Ordinal)).Select(p=>p.Value.Describe())):"";
             card.Element.ToolTip=info+"\u2063\n"+L.F("Next check: {0}",countdown)+(forecastText.Length>0?"\n"+forecastText:"");
         }
-        if(!busy){string next=string.Join(" · ",WidgetPreferences.ProviderIds.Select(id=>ProviderName(id)+" "+TimeSpan.FromSeconds(schedule.Remaining(id,now)).ToString(@"h\:mm\:ss")));footer.Text=L.F("{0} of 4 sources current",cards.Values.Count(c=>c.Health=="ready"))+" · ↻ "+TimeSpan.FromSeconds(WidgetPreferences.ProviderIds.Min(id=>schedule.Remaining(id,now))).ToString(@"m\:ss");footer.ToolTip=L.F("Next check: {0}",next);foreach(var button in refreshButtons)button.ToolTip=footer.ToolTip;}
+        var enabled=WidgetPreferences.ProviderIds.Where(id=>!preferences.DisabledProviders.Contains(id)).ToArray();
+        if(!busy){string next=string.Join(" · ",enabled.Select(id=>ProviderName(id)+" "+TimeSpan.FromSeconds(schedule.Remaining(id,now)).ToString(@"h\:mm\:ss")));footer.Text=L.F("{0} of {1} sources current",enabled.Count(id=>cards[id].Health=="ready"),enabled.Length)+" · ↻ "+TimeSpan.FromSeconds(enabled.Select(id=>schedule.Remaining(id,now)).DefaultIfEmpty(0).Min()).ToString(@"m\:ss");footer.ToolTip=L.F("Next check: {0}",next);foreach(var button in refreshButtons)button.ToolTip=footer.ToolTip;}
     }
     void CheckLowQuota()
     {
@@ -144,7 +147,7 @@ public sealed partial class Widget
         var taskbarIds=new[]{"none","cpu","ram","gpu","battery"}.Concat(WidgetPreferences.ProviderIds).ToArray();var taskbarNames=taskbarIds.Select(id=>L.T(id=="none"?"None":MetricName(id))).ToArray();var taskbarChoice=Choose(general,"Taskbar bar metric",taskbarNames,taskbarNames[Array.IndexOf(taskbarIds,preferences.TaskbarMetric)]);
         var languageNames=new[]{"English","हिन्दी","Español","Français"};var languageIds=new[]{"en","hi","es","fr"};var language=Choose(general,"Language",languageNames,languageNames[Array.IndexOf(languageIds,preferences.Language)]);
         general.Children.Add(Text("Opacity",12,Muted));var opacity=new Slider{Minimum=.65,Maximum=1,Value=preferences.Opacity,TickFrequency=.05,IsSnapToTickEnabled=true,Margin=new Thickness(0,8,0,16)};general.Children.Add(opacity);
-        general.Children.Add(Button("Connections…","Connections…",()=>{dialog.Close();ShowConnection("cursor","Cursor");}));general.Children.Add(Button("World clocks…","World clocks…",()=>{dialog.Close();ShowClocks();}));
+        general.Children.Add(Button("Connections…","Connections…",()=>{dialog.Close();ShowProviders();}));general.Children.Add(Button("World clocks…","World clocks…",()=>{dialog.Close();ShowClocks();}));
         general.Children.Add(Text("Startup is optional and uses only your Windows account. Closing Prism exits; Hide to tray keeps monitoring.",11,Muted));
         var rates=Tab("Refresh rates");rates.Children.Add(Text("Provider caches and rate limits still apply. Hover a provider or the footer for its next check.",12,Muted));
         var intervals=new[]{60,300,600,900,1800,3600};var rateBoxes=new Dictionary<string,ComboBox>();

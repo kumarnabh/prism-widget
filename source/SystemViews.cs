@@ -12,6 +12,8 @@ public sealed partial class Widget
     readonly TextBlock emptyMetrics=Text("No metrics selected. Open Settings to choose metrics.",13,Muted);
     HardwareSnapshot Hardware=>hardwareFixture??hardware.Latest;
     readonly List<object> systemLayouts=new();
+    readonly System.Windows.Controls.Primitives.UniformGrid expandedHardware=new(){Columns=2,Margin=new Thickness(0,0,0,10)};
+    readonly Dictionary<string,MetricTile> expandedHardwareTiles=new();
     bool taskbarMinimize;LiveTaskbarPreview? taskbarPreview;
     int MinimumMetricHeight(double width)
     {
@@ -37,6 +39,7 @@ public sealed partial class Widget
         foreach(string id in WidgetPreferences.ExtraMetricIds){var value=Hardware.Metrics.FirstOrDefault(m=>m.Id==id);
             string detail=value?.Details??"";string state=value?.State(now)??"Unavailable";
             metricTiles[id].Set(value?.Display(now)??"—",L.T(MetricName(id))+" · "+L.T(state)+(detail.Length>0?" · "+detail:"")+(value is not null?"\n"+L.F("Captured: {0}",value.At.LocalDateTime.ToString("g")):""),value?.Current(now)==true?value.Percent:null,health:state=="Current"?"ready":state=="Stale"?"stale":"unknown");
+            expandedHardwareTiles[id].Set(value?.Display(now)??"—",metricTiles[id].Element.ToolTip?.ToString()??"",value?.Current(now)==true?value.Percent:null,health:state=="Current"?"ready":state=="Stale"?"stale":"unknown");
         }
     }
     void ShowSystemCapacity()
@@ -113,6 +116,10 @@ public sealed partial class Widget
     void VerifySystemViews()
     {
         var saved=preferences.Copy();var savedFixture=hardwareFixture;var now=DateTimeOffset.UtcNow;
+        preferences.VisibleMetrics=WidgetPreferences.BaseMetricIds.Concat(new[]{"gpu"}).ToList();ApplyMetricPreferences();compact=false;Width=442;Height=858;UpdateLayout();AdaptLayout();
+        if(metricsOnly||expandedBody.Visibility!=Visibility.Visible)throw new InvalidOperationException("GPU preserves expanded dashboard");
+        preferences.VisibleMetrics=WidgetPreferences.BaseMetricIds.Concat(new[]{"battery"}).ToList();hardwareFixture=Hardware with{BatteryPresent=false,At=now};ApplyMetricPreferences();AdaptLayout();
+        if(metricsOnly||expandedHardware.Visibility!=Visibility.Collapsed)throw new InvalidOperationException("Hidden battery preserves expanded dashboard");
         var metrics=WidgetPreferences.ExtraMetricIds.Select(id=>new SystemMetric(id,MetricName(id),id=="frequency"?3.4:id=="vram"?3.1:35,id is "gpu" or "battery"?"%":id=="frequency"?" GHz":id=="vram"?" GB":" MB/s",35,now)).Concat(new[]{new SystemMetric("gpu:fixture","Example GPU",35,"%",35,now),new SystemMetric("vram:fixture","Dedicated VRAM",3.1," GB",38.75,now,Details:"8 GB total · 4.9 GB free")}).ToArray();
         hardwareFixture=new(metrics,new[]{new GpuAdapter("fixture","Example GPU",8UL*1073741824)},new[]{new DiskCapacity("C:\\",50L*1073741824,500L*1073741824,now),new DiskCapacity("D:\\",100L*1073741824,1000L*1073741824,now)},now,0);
         foreach(string language in new[]{"en","hi","es","fr"}){

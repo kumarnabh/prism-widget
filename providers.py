@@ -167,24 +167,25 @@ def manual(name):
             'detail':f'{remaining:g} / {total:g} {data.get("unit","units")} remaining'}
 
 def collect(selected=None):
-    result={}
-    tasks={'codex':codex,'claude':claude,'opencode':lambda:auto_sources.collect_account('opencode'),
-           'cursor':lambda:auto_sources.collect_account('cursor')}
-    if selected is not None:
-        unknown=set(selected)-tasks.keys()
-        if unknown: raise ValueError('Unknown provider selection')
-        tasks={name:fn for name,fn in tasks.items() if name in selected}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-        jobs={pool.submit(fn):name for name,fn in tasks.items()}
-        for future in concurrent.futures.as_completed(jobs):
-            name=jobs[future]
-            try: result[name]=future.result()
-            except Exception: result[name]={'status':'Unavailable','detail':'Usage source unavailable. Check its connection.'}
-    return result
+    from provider_registry import adapters
+    registry=adapters()
+    selected=list(registry) if selected is None else list(dict.fromkeys(selected))
+    if set(selected)-registry.keys():raise ValueError('Unknown provider selection')
+    def worker(name):
+        try: raw=registry[name].collect()
+        except Exception: raw={'status':'Unavailable','detail':'Usage source unavailable. Check its connection.'}
+        try:return registry[name].normalize(raw)
+        except Exception:return registry[name].normalize(None)
+    # The native host owns one process tree/deadline per provider. Never abandon a
+    # CLI-owning daemon thread: keep this parent alive until finally blocks finish.
+    if len(selected)==1:return {selected[0]:worker(selected[0])}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1,len(selected))) as pool:
+        futures={name:pool.submit(worker,name) for name in selected}
+        return {name:future.result() for name,future in futures.items()}
 
 if __name__=='__main__':
     import argparse
     parser=argparse.ArgumentParser(description='Read selected provider quota without model prompts.')
-    parser.add_argument('--providers',nargs='+',choices=['codex','cursor','opencode','claude'])
+    parser.add_argument('--providers',nargs='+',choices=[row['id'] for row in __import__('provider_registry').manifest()])
     args=parser.parse_args()
     print(json.dumps(collect(args.providers),ensure_ascii=True))

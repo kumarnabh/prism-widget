@@ -35,3 +35,11 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Window off-screen | Close Prism and rename `data/window.json` to a backup, then reopen. |
 
 Provider interface changes may require adapter updates. Describe failures with synthetic structures, never live tokens, databases, transcripts or data folders. Physical mixed-DPI transitions and Windows ARM64 are not validated; the release targets x64.
+
+## 2.1 connections and rendering
+
+If selecting GPU removed the full glass view in 2.0, upgrade and choose More → restore details (or Ctrl+M); expanded mode now keeps hardware metrics. Very short layouts still use the compact grid. Fit height removes unused vertical space.
+
+Connections shows disabled, waiting, current and stale states per provider, with source, refresh schedule and last successful capture. Disable stops collection; hiding a metric alone does not. A slow source no longer suppresses other results.
+
+OpenRouter requires both provider enablement and separate environment-key consent. It never asks for pasted keys. Restart Prism after changing the inherited environment. An unlimited key has no finite percentage; an unknown reset is expected because the endpoint reports cadence, not an exact timestamp. Check the provider key settings if the quota is unknown. No live-account OpenRouter qualification is required for CI; adapter tests use documented synthetic fixtures.

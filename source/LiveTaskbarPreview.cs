@@ -39,10 +39,9 @@ public sealed class LiveTaskbarPreview:IDisposable
             drawing.DrawRoundedRectangle(new LinearGradientBrush(Color.FromRgb(27,48,74),Color.FromRgb(16,25,43),80),new Pen(new SolidColorBrush(Color.FromRgb(100,140,175)),1),new Rect(0,0,width,height),12,12);
             void Text(string value,double x,double y,double size,Brush brush,double max){var text=new FormattedText(value,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface("Segoe UI"),size,brush,1){MaxTextWidth=Math.Max(1,max),MaxTextHeight=size*1.5,Trimming=TextTrimming.CharacterEllipsis};drawing.DrawText(text,new Point(x,y));}
             if(width>=80&&height>=60){
-            Text("P R I S M",14,10,14,Ink,width-28);
             if(metrics.Length==0)Text(L.T("No metrics selected"),14,45,12,muted,width-28);
             int columns=metrics.Length>6&&width>=240?2:1;int maximum=Math.Max(1,(height-42)/32)*columns;int omitted=Math.Max(0,metrics.Length-maximum);metrics=metrics.Take(maximum).ToArray();
-            if(omitted>0)Text("P R I S M  · +"+omitted,14,10,12,Ink,width-28);
+            Text(omitted>0?"P R I S M  · +"+omitted:"P R I S M",14,10,omitted>0?12:14,Ink,width-28);
             int count=(int)Math.Ceiling(metrics.Length/(double)columns);double cell=(width-28d-12*(columns-1))/columns;double row=count==0?30:Math.Min(44,(height-42d)/count);
             for(int i=0;i<metrics.Length;i++){
                 var metric=metrics[i];double x=14+(i%columns)*(cell+12),y=34+(i/columns)*row;bool current=metric.Percent.HasValue&&double.IsFinite(metric.Percent.Value)&&metric.Percent.Value is >=0 and <=100;

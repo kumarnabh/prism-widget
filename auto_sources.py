@@ -57,13 +57,32 @@ def parse_cursor(data):
     if not windows:raise UsageError('Cursor returned no recognized included-usage balance. The dashboard format may have changed.')
     return windows
 
+def parse_openrouter(data):
+    value=data.get('data')
+    if not isinstance(value,dict):raise UsageError('OpenRouter returned an unexpected quota format.')
+    limit=value.get('limit');remaining=value.get('limit_remaining')
+    if limit is None:raise UsageError('This key has no finite spending limit. Remaining allowance is unknown.')
+    if not numeric(limit) or limit<=0 or not numeric(remaining) or not 0<=remaining<=limit:
+        raise UsageError('OpenRouter returned an invalid key allowance.')
+    # The API reports a reset cadence, not an exact timestamp. Do not invent one.
+    return [{'id':'key-credit-limit','label':'Key credit allowance (USD)','remaining':100*remaining/limit,'reset':None}]
+
+def openrouter_token():
+    token=os.environ.get('OPENROUTER_API_KEY','')
+    if not re.fullmatch(r'[A-Za-z0-9_-]{16,4096}',token):raise UsageError('An existing OPENROUTER_API_KEY environment variable is required. Restart Prism after configuring it in your provider tools.')
+    return token
+
+def openrouter_enabled():
+    try:return json.loads((DATA/'connections.json').read_text()).get('allowOpenRouter') is True
+    except (OSError,ValueError,AttributeError):return False
+
 def enabled():
     try:return json.loads((DATA/'connections.json').read_text()).get('allowStoredCredentials') is True
     except (OSError,ValueError):return False
 
 def get_json(url,headers):
-    # Only the two quota endpoints can receive stored credentials. Redirects are refused.
-    if url not in ('https://opencode.ai/zen/go/v1/usage','https://cursor.com/api/usage-summary'):
+    # Exact reviewed read-only endpoints only. Redirects are refused.
+    if url not in ('https://opencode.ai/zen/go/v1/usage','https://cursor.com/api/usage-summary','https://openrouter.ai/api/v1/key'):
         raise UsageError('Unapproved usage endpoint.')
     request=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':'Prism-Widget/1.1',**headers})
     try:
@@ -72,15 +91,17 @@ def get_json(url,headers):
             if len(raw)>262144:raise UsageError('Usage response too large.')
             return json.loads(raw)
     except urllib.error.HTTPError as exc:
-        if exc.code==403 and url.startswith('https://opencode.ai/'):
-            try:
-                payload=json.loads(exc.read(16384))
-                if payload.get('error',{}).get('type')=='EntitlementError':
-                    raise UsageError('The saved Go key has no Go subscription. Reconnect OpenCode Go to your subscribed workspace.')
-            except (ValueError,TypeError,AttributeError):pass
-        if exc.code in (401,403):raise UsageError('Sign-in needs attention. Open the provider app, sign in, then refresh.') from None
-        if exc.code==429:raise UsageError('Usage service rate limited this check. Automatic checks pause for 15 minutes.') from None
-        raise UsageError(f'Usage service returned HTTP {exc.code}.') from None
+        try:
+            if exc.code==403 and url.startswith('https://opencode.ai/'):
+                try:
+                    payload=json.loads(exc.read(16384))
+                    if payload.get('error',{}).get('type')=='EntitlementError':
+                        raise UsageError('The saved Go key has no Go subscription. Reconnect OpenCode Go to your subscribed workspace.')
+                except (ValueError,TypeError,AttributeError):pass
+            if exc.code in (401,403):raise UsageError('Sign-in needs attention. Open the provider app, sign in, then refresh.') from None
+            if exc.code==429:raise UsageError('Usage service rate limited this check. Automatic checks pause for 15 minutes.') from None
+            raise UsageError(f'Usage service returned HTTP {exc.code}.') from None
+        finally:exc.close()
     except (urllib.error.URLError,TimeoutError):raise UsageError('Usage service could not be reached. Check your connection.') from None
     except (ValueError,TypeError):raise UsageError('Usage service returned an unexpected response.') from None
 
@@ -114,11 +135,14 @@ def go_token():
     except Exception:raise UsageError('Connect OpenCode Go inside OpenCode first, then refresh Prism.') from None
 
 def collect_account(name):
-    if not enabled():return {'status':'Connect','detail':'Enable automatic account connections in Settings.'}
+    if name not in ('cursor','opencode','openrouter'):raise ValueError('Unknown account adapter')
+    if not (openrouter_enabled() if name=='openrouter' else enabled()):return {'status':'Connect','detail':'Enable this account connection in Settings.'}
     token=None
     try:
         if name=='cursor':
             subject,token=cursor_token();headers={'Cookie':'WorkosCursorSessionToken='+subject+'%3A%3A'+token};url='https://cursor.com/api/usage-summary';parse=parse_cursor
+        elif name=='openrouter':
+            token=openrouter_token();headers={'Authorization':'Bearer '+token};url='https://openrouter.ai/api/v1/key';parse=parse_openrouter
         else:
             token=go_token();headers={'Authorization':'Bearer '+token};url='https://opencode.ai/zen/go/v1/usage';parse=parse_go
         fingerprint=hashlib.sha256(token.encode()).hexdigest()
