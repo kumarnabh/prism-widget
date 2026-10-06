@@ -1,5 +1,11 @@
 # Pre-publication review
 
+## 2.1.1 Cursor model display — 2026-10-06
+
+The Cursor summary previously used the smallest percentage across Included, Cursor models and Other models. The front card now selects the validated autoPercentUsed window explicitly, and compact/tray/taskbar displays share that selection. If the Cursor-model window is missing or expired, the summary is unknown rather than another category. All reported windows remain intact for details, per-window forecasts/alerts and history; their actual limiting allowance is unchanged. No provider request, credential reuse, cache format, sampling, dependency or privacy behavior changes.
+
+Added native regressions with different category percentages, known zero/full, missing/expired primary quota, stale readings, full/compact accessible values and taskbar freshness. Local Release build: zero warnings/errors. All 61 Python tests, three browser tests and 740 native layout cases passed, including the new selection regressions. Synthetic expanded and ribbon renders were inspected. Hosted results, exact package verification and release checksum are recorded with the patch release. The README documents the Cursor-specific summary semantics.
+
 ## 2.1.0 provider ecosystem — 2026-10-04
 
 Reviewed main at 2f8b1f3 before changes. Confirmed and fixed two existing rendering regressions: any extra hardware selection forced compact mode, and omitted-count taskbar previews painted their title twice. Expanded hardware now has its own grid; insufficient space uses compact mode without shrinking typography.

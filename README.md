@@ -70,7 +70,7 @@ OpenRouter is disabled by default. In Connections, enable it and separately allo
 
 ## Readings and controls
 
-AI percentages show the **lowest remaining allowance among valid reported windows**: any window may limit use. Hover for all windows, source, capture time and known resets. A dash means unknown, never full. Status dots: green current, amber stale, pink error, gray unavailable. Capacity turns amber at 25% and coral at 10%.
+The Cursor card shows **Cursor models** (`autoPercentUsed` remaining), including in compact, tray and taskbar views. Missing Cursor-model quota stays unknown; Included and Other models remain in details/history/alerts. Other AI percentages show the **lowest remaining allowance among valid reported windows**: any window may limit use. Hover for all windows, source, capture time and known resets. A dash means unknown, never full. Status dots: green current, amber stale, pink error, gray unavailable. Capacity turns amber at 25% and coral at 10%.
 
 System readings update every two seconds. Default AI checks: Codex every 60 seconds; Cursor, OpenCode Go, Claude and enabled OpenRouter every five minutes. Settings → Refresh rates lets you choose 1/5/10/15/30/60 minutes per provider. A five-second scheduler launches only due adapters; hover a provider or the footer for its countdown. F5 requests all enabled providers immediately but still respects provider caches and error backoff. Readings older than ten minutes are marked stale, even with a longer schedule. Network is aggregate Ethernet/Wi-Fi throughput and may include virtual adapters. Charts retain up to 72 seconds. Disk bars show **free** space.
 

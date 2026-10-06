@@ -93,7 +93,7 @@ public sealed partial class Widget
     {
         double? percent=null;
         if(MetricVisible(id)){
-            if(WidgetPreferences.ProviderIds.Contains(id)&&providerData.TryGetValue(id,out var data)){var reading=QuotaSnapshot.Read(data,now);if(UsageHistory.Fresh(reading,now))percent=reading.Remaining;}
+            if(WidgetPreferences.ProviderIds.Contains(id)&&providerData.TryGetValue(id,out var data)){var reading=QuotaSnapshot.Read(data,now);if(UsageHistory.Fresh(reading,now))percent=reading.DashboardRemaining(id);}
             else{var metric=Hardware.Metrics.FirstOrDefault(m=>m.Id==id);if(metric?.Current(now)==true)percent=metric.Percent;}
         }
         return percent;
@@ -108,7 +108,7 @@ public sealed partial class Widget
         var now=DateTimeOffset.UtcNow;return preferences.MetricOrder.Where(MetricVisible).Select(id=>{
             if(WidgetPreferences.ProviderIds.Contains(id)){
                 var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;bool fresh=reading is not null&&UsageHistory.Fresh(reading,now);
-                return new BarMetric(ProviderName(id),reading?.Remaining is double remaining?$"{remaining:0.#}%":"—",fresh?reading?.Remaining:null,reading?.Status??"Unavailable",true);
+                return new BarMetric(ProviderName(id),reading?.DashboardRemaining(id) is double remaining?$"{remaining:0.#}%":"—",fresh?reading?.DashboardRemaining(id):null,reading?.Status??"Unavailable",true);
             }
             var metric=Hardware.Metrics.FirstOrDefault(m=>m.Id==id);return new BarMetric(L.T(MetricName(id)),metric?.Display(now)??"—",metric?.Current(now)==true?metric.Percent:null,metric?.State(now)??"Unavailable");
         }).ToArray();

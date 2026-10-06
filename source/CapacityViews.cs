@@ -84,8 +84,8 @@ public sealed partial class Widget
         var list=new StackPanel();stack.Children.Add(list);
         void Update(){system.Text="CPU "+cpuValue.Text+"  ·  "+L.T("Memory")+" "+ramValue.Text;list.Children.Clear();var now=DateTimeOffset.UtcNow;foreach(var id in WidgetPreferences.ProviderIds.Where(id=>!preferences.DisabledProviders.Contains(id))){
             var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;
-            string value=reading?.Remaining is double remaining?$"{remaining:0.#}%":"—";
-            string state=reading?.Status??"Unavailable";if(reading?.Remaining is not null&&UsageHistory.Fresh(reading,now))state=reading.Remaining<=10?"Critical capacity":reading.Remaining<=25?"Low capacity":state;
+            double? primary=reading?.DashboardRemaining(id);string value=primary is double remaining?$"{remaining:0.#}%":"—";
+            string state=reading?.Status??"Unavailable";if(primary is not null&&reading is not null&&UsageHistory.Fresh(reading,now))state=primary<=10?"Critical capacity":primary<=25?"Low capacity":state;
             var row=Text(ProviderName(id)+"  "+value+" · "+L.T(state),13);row.Margin=new Thickness(0,8,0,0);list.Children.Add(row);
         }
         var next=providerData.SelectMany(p=>{var reading=QuotaSnapshot.Read(p.Value,now);return reading.Windows.Where(w=>w.Reset>now&&UsageHistory.Fresh(reading,now)).Select(w=>(id:p.Key,window:w));}).OrderBy(x=>x.window.Reset).FirstOrDefault();

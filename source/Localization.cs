@@ -27,6 +27,7 @@ public static class L
         if(Application.Current is not null)foreach(var key in Words.Keys)Application.Current.Resources["t."+key]=T(key);
     }
     const string Data="""
+Cursor models quota unavailable.|Cursor मॉडल का कोटा उपलब्ध नहीं है।|Cuota de modelos de Cursor no disponible.|Quota des modèles Cursor indisponible.
 Providers|प्रदाता|Proveedores|Fournisseurs
 Connections and providers|कनेक्शन और प्रदाता|Conexiones y proveedores|Connexions et fournisseurs
 Read-only sources. Authentication stays with your provider.|केवल पढ़ने वाले स्रोत। साइन-इन प्रदाता संभालता है।|Fuentes de solo lectura. Su proveedor gestiona el acceso.|Sources en lecture seule. Le fournisseur gère la connexion.

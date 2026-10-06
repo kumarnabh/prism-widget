@@ -12,16 +12,36 @@ public sealed partial class Widget
     void CancelProvider(string id){if(providerRequests.TryGetValue(id,out var request))request.Cancel();}
     readonly Dictionary<string,DateTimeOffset> lastSuccess=new();
     readonly List<object> ecosystemLayouts=new();
+    void VerifyCursorDisplay(DateTimeOffset now)
+    {
+        foreach(var scenario in new[]{(value:(double?)73,expired:false,age:0),(value:(double?)0,expired:false,age:0),(value:(double?)100,expired:false,age:0),(value:(double?)null,expired:false,age:0),(value:(double?)73,expired:true,age:0),(value:(double?)73,expired:false,age:601)}){
+            var windows=new List<object>{new{id="apiPercentUsed",label="Other models",remaining=7d,reset=(long?)null},new{id="totalPercentUsed",label="Included",remaining=31d,reset=(long?)now.AddHours(2).ToUnixTimeSeconds()}};
+            if(scenario.value is double current)windows.Add(new{id="autoPercentUsed",label="Cursor models",remaining=current,reset=(long?)now.AddHours(scenario.expired?-1:4).ToUnixTimeSeconds()});
+            using var fixture=JsonDocument.Parse(JsonSerializer.Serialize(new{status="Live",at=now.AddSeconds(-scenario.age).ToUnixTimeSeconds(),windows}));
+            var reading=QuotaSnapshot.Read(fixture.RootElement,now);double? expected=scenario.expired?null:scenario.value;
+            if(reading.DashboardRemaining("cursor")!=expected||reading.DashboardRemaining("codex")!=reading.Remaining)throw new InvalidOperationException("Cursor primary category selection");
+            if(expected.HasValue&&reading.ResetSummary(now,"cursor")!="Resets in 4h"||!expected.HasValue&&reading.ResetSummary(now,"cursor")!="")throw new InvalidOperationException("Cursor primary reset selection");
+            providerData["cursor"]=fixture.RootElement.Clone();cards["cursor"].Update(fixture.RootElement);
+            if(cards["cursor"].Remaining!=expected||!cards["cursor"].Element.ToolTip.ToString()!.Contains("Other models 7%"))throw new InvalidOperationException("Cursor card retains category details");
+            foreach(var density in new[]{(level:0,width:400d),(level:1,width:160d)}){
+                cards["cursor"].SetDensity(density.level,density.width);string value=expected is double percentage?$"{percentage:0.#}%":"—";
+                if(cards["cursor"].CompactValue!=value||!System.Windows.Automation.AutomationProperties.GetName(cards["cursor"].Element).Contains(value))throw new InvalidOperationException("Cursor full/compact/accessibility value");
+            }
+            double? fresh=scenario.age==0?expected:null;var row=TaskbarRows().Single(r=>r.Label==ProviderName("cursor"));
+            if(TaskbarPercent("cursor",now)!=fresh||row.Percent!=fresh||row.Value!=cards["cursor"].CompactValue)throw new InvalidOperationException("Cursor taskbar display/freshness");
+            if(scenario.age>0&&cards["cursor"].Health!="stale")throw new InvalidOperationException("Cursor stale display state");
+        }
+    }
     void VerifyProviderViews()
     {
         var saved=preferences.Copy();var previousHardware=hardwareFixture;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);var now=DateTimeOffset.UtcNow;
         foreach(string state in new[]{"Connect","Unavailable"}){using var error=JsonDocument.Parse(JsonSerializer.Serialize(new{status=state,detail="Connection guidance fixture",windows=Array.Empty<object>()}));cards["codex"].Update(error.RootElement);if(cards["codex"].Remaining is not null||!cards["codex"].Element.ToolTip.ToString()!.Contains("Connection guidance fixture"))throw new InvalidOperationException("Empty quota preserves connection guidance");}
-        preferences.DisabledProviders.Clear();preferences.VisibleMetrics=WidgetPreferences.MetricIds.ToList();preferences.ActiveProvidersOnly=false;
+        preferences.DisabledProviders.Clear();preferences.VisibleMetrics=WidgetPreferences.MetricIds.ToList();preferences.ActiveProvidersOnly=false;VerifyCursorDisplay(now);
         var metrics=new[]{new SystemMetric("cpu","CPU",24,"%",24,now),new("ram","Memory",58,"%",58,now,Details:"9.3 / 16 GB"),new("disk","Free disk",240," GB",48,now),new("net","Network",1048576," B/s",null,now,Details:"524288")}.Concat(WidgetPreferences.ExtraMetricIds.Select(id=>new SystemMetric(id,MetricName(id),id=="frequency"?3.4:id=="vram"?3.1:35,id is "gpu" or "battery"?"%":id=="frequency"?" GHz":id=="vram"?" GB":" MB/s",id is "gpu" or "battery"?35:id=="vram"?38.75:null,now))).ToArray();
         hardwareFixture=new(metrics,Array.Empty<GpuAdapter>(),Array.Empty<DiskCapacity>(),now,0,true);cpuHistory.Clear();ramHistory.Clear();ReadSystemSnapshot();
         foreach(string language in new[]{"en","hi","es","fr"}){
             L.Set(language);
-            foreach(var definition in ProviderCatalog.All){using var fixture=JsonDocument.Parse(JsonSerializer.Serialize(new{schema_version=1,provider_id=definition.Id,status="Live",source=definition.Source,detail="Synthetic example",at=now.ToUnixTimeSeconds(),windows=new[]{new{id="example",label="Allowance",remaining=42d,reset=(long?)null}}}));providerData[definition.Id]=fixture.RootElement.Clone();cards[definition.Id].Update(fixture.RootElement);}
+            foreach(var definition in ProviderCatalog.All){using var fixture=JsonDocument.Parse(JsonSerializer.Serialize(new{schema_version=1,provider_id=definition.Id,status="Live",source=definition.Source,detail="Synthetic example",at=now.ToUnixTimeSeconds(),windows=definition.Id=="cursor"?new[]{new{id="autoPercentUsed",label="Cursor models",remaining=73d,reset=(long?)null},new{id="apiPercentUsed",label="Other models",remaining=7d,reset=(long?)null},new{id="totalPercentUsed",label="Included",remaining=31d,reset=(long?)null}}:new[]{new{id="example",label="Allowance",remaining=42d,reset=(long?)null}}}));providerData[definition.Id]=fixture.RootElement.Clone();cards[definition.Id].Update(fixture.RootElement);}
             ApplyMetricPreferences();ShowProviders();ShowOpenRouter();
             foreach(var size in new[]{(340d,220d),(442d,858d),(560d,165d),(840d,800d),(1200d,120d),(420d,640d)}){
                 compact=size.Item2<640;Width=size.Item1;Height=size.Item2;UpdateLayout();AdaptLayout();UpdateLayout();var check=CheckLayout();
