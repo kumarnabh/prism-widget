@@ -6,6 +6,10 @@ public sealed record QuotaWindow(string Label,double Remaining,DateTimeOffset? R
 public sealed record QuotaSnapshot(string Status,string Source,string Detail,DateTimeOffset? Captured,IReadOnlyList<QuotaWindow> Windows,string Scope="")
 {
     public double? Remaining=>Windows.Count==0?null:Windows.Min(w=>w.Remaining);
+    // Cursor's card represents Cursor models, not the minimum of unrelated model pools.
+    // Keep all windows and the actual limiting allowance for history/alerts/details.
+    public QuotaWindow? DashboardWindow(string provider)=>provider=="cursor"?Windows.FirstOrDefault(w=>w.Id=="autoPercentUsed"):Windows.OrderBy(w=>w.Remaining).FirstOrDefault();
+    public double? DashboardRemaining(string provider)=>DashboardWindow(provider)?.Remaining;
     public static QuotaSnapshot Read(JsonElement data,DateTimeOffset now)
     {
         string Text(string key,string fallback="")=>data.ValueKind==JsonValueKind.Object&&data.TryGetProperty(key,out var field)&&field.ValueKind==JsonValueKind.String?field.GetString()??fallback:fallback;
@@ -34,9 +38,9 @@ public sealed record QuotaSnapshot(string Status,string Source,string Detail,Dat
         if(!value.TryGetDoubleSafe(out double seconds)||seconds<=0||seconds>253402300799)return null;
         return DateTimeOffset.FromUnixTimeSeconds((long)seconds);
     }
-    public string ResetSummary(DateTimeOffset now)
+    public string ResetSummary(DateTimeOffset now,string provider="")
     {
-        var limiting=Windows.OrderBy(w=>w.Remaining).FirstOrDefault();
+        var limiting=DashboardWindow(provider);
         if(limiting?.Reset is not DateTimeOffset reset)return "";
         var span=reset-now;
         return span.TotalDays>=1?L.F("Resets in {0}d",Math.Ceiling(span.TotalDays)):span.TotalHours>=1?L.F("Resets in {0}h",Math.Ceiling(span.TotalHours)):L.F("Resets in {0}m",Math.Max(1,Math.Ceiling(span.TotalMinutes)));

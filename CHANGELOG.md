@@ -1,5 +1,11 @@
 # Change log
 
+## 2.1.1 — Cursor model display correction
+
+- Cursor card, compact grid, tray and taskbar now show Cursor models instead of the minimum of all model categories.
+- Missing/expired Cursor-model quota remains unknown; Included/Other models remain in details, history and per-window alerts.
+- Added native regressions for differing categories, zero/full allowance, stale/expired/missing readings and full/compact presentation.
+
 ## 2.1.0 — Provider ecosystem and restored glass dashboard
 
 - Restored expanded gauges/provider cards when extra hardware is selected; compact fallback is based on available space. Fixed overlapping taskbar thumbnail titles.

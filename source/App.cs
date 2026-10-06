@@ -762,7 +762,7 @@ public sealed partial class Widget : Window
         public string CompactValue=>Remaining is double number?$"{number:0.#}%":"—";
         public double? Remaining{get;private set;}
         readonly TextBlock value=Text("—",22),detail=Text("Connecting…",10,Muted),status=Text("WAITING",9,Muted);
-        readonly Meter bar;readonly string name;readonly Brush accent;
+        readonly Meter bar;readonly string name,key;readonly Brush accent;
         readonly StackPanel labels=new();
         readonly Grid row=Columns(37,-1,115),readout=Columns(-1,-1);
         readonly TextBlock title;
@@ -770,7 +770,7 @@ public sealed partial class Widget : Window
         bool tileLayout;
         public ProviderCard(string key,string name,string icon,string color,Action click)
         {
-            this.name=name;accent=Brush(color);var stack=new StackPanel();
+            this.name=name;this.key=key;accent=Brush(color);var stack=new StackPanel();
             mark=new Border{Background=Brush(color),CornerRadius=new CornerRadius(10),Width=29,Height=29,VerticalAlignment=VerticalAlignment.Top,Child=new TextBlock{Text=icon,FontSize=21,Foreground=Brush("#12212E"),HorizontalAlignment=HorizontalAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};Add(row,mark,0);
             title=Text(name,14);title.FontWeight=FontWeights.SemiBold;labels.Children.Add(title);labels.Children.Add(status);Add(row,labels,1);
             value.HorizontalAlignment=HorizontalAlignment.Right;value.Foreground=Brush(color);Add(row,value,2);stack.Children.Add(row);readout.Visibility=Visibility.Collapsed;stack.Children.Add(readout);
@@ -815,15 +815,15 @@ public sealed partial class Widget : Window
         public void Update(JsonElement data)
         {
             var now=DateTimeOffset.UtcNow;var reading=QuotaSnapshot.Read(data,now);
-            Remaining=reading.Remaining;var state=reading.Status;status.Text=L.T(state);
+            Remaining=reading.DashboardRemaining(key);var state=reading.Status;status.Text=L.T(state);
             if(reading.Captured is DateTimeOffset at){double seconds=Math.Max(0,(now-at).TotalSeconds);status.Text+=" · "+(seconds<60?L.T("just now"):seconds<3600?L.F("{0:0}m ago",seconds/60):L.F("{0:0}h ago",seconds/3600));}
             bar.Value=Remaining??0;bar.Opacity=Remaining.HasValue?1:.15;
             if(Remaining is double remaining){
                 value.Text=tileLayout?$"{remaining:0.#}%":L.F("{0:0.#}% left",remaining);
-                var parts=reading.Windows.Select(w=>$"{w.Label} {w.Remaining:0.#}%").ToList();
-                string reset=reading.ResetSummary(now);if(reset.Length>0)parts.Add(reset);
+                var parts=reading.Windows.OrderBy(w=>key=="cursor"&&w.Id=="autoPercentUsed"?0:1).Select(w=>$"{w.Label} {w.Remaining:0.#}%").ToList();
+                string reset=reading.ResetSummary(now,key);if(reset.Length>0)parts.Add(reset);
                 detail.Text=string.Join(" · ",parts);
-            }else{value.Text="—";detail.Text=L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out var reported)&&reported.ValueKind==JsonValueKind.Array&&reported.GetArrayLength()>0?"No current quota window · waiting for a fresh reading":reading.Detail);}
+            }else{value.Text="—";detail.Text=key=="cursor"&&reading.Windows.Count>0?L.T("Cursor models quota unavailable.")+" "+string.Join(" · ",reading.Windows.Select(w=>$"{w.Label} {w.Remaining:0.#}%")):L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out var reported)&&reported.ValueKind==JsonValueKind.Array&&reported.GetArrayLength()>0?"No current quota window · waiting for a fresh reading":reading.Detail);}
             Health=Remaining.HasValue?(state.Contains("Stale",StringComparison.OrdinalIgnoreCase)?"stale":"ready"):(state=="Connect"||state=="Waiting"?"unknown":"error");
             if(Health=="stale"){bar.Opacity=.4;detail.Text="Last reported · "+detail.Text;}
             var capacityColor=Remaining<=10?Brush("#F0A29A"):Remaining<=25?Brush("#E8C083"):accent;
