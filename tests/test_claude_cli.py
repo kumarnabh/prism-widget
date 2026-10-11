@@ -54,6 +54,16 @@ class CliTests(unittest.TestCase):
             self.assertEqual(c.collect()['status'],'CLI');c.collect();self.assertEqual(panel.call_count,1)
             path=pathlib.Path(folder)/'claude-cli.json';data=json.loads(path.read_text());self.assertNotIn('private@example',path.read_text());data['checked']=at-301;path.write_text(json.dumps(data));panel.return_value={'status':'Unavailable','detail':'failed'}
             reading=c.collect();self.assertEqual(reading['status'],'Stale');self.assertEqual(reading['at'],at)
+    def test_missing_terminal_libraries_are_explained_and_not_cached(self):
+        auth=json.dumps({'loggedIn':True,'authMethod':'claude.ai','email':'private@example.test'})
+        with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(c,'DATA',pathlib.Path(folder)),patch.object(c,'executable',return_value='claude.exe'),patch.object(c.subprocess,'run',return_value=SimpleNamespace(stdout=auth)),patch.object(c,'read_panel',side_effect=ModuleNotFoundError("No module named 'winpty'")) as panel:
+            reading=c.collect()
+            self.assertEqual(reading['status'],'Unavailable');self.assertIn('Setup.cmd',reading['detail']);self.assertNotIn('windows',reading)
+            self.assertFalse((pathlib.Path(folder)/'claude-cli.json').exists())
+            c.collect();self.assertEqual(panel.call_count,2)  # Retries immediately once dependencies exist.
+            from provider_contract import normalize
+            result=normalize({'id':'claude','name':'Claude','capabilities':[],'source':'x'},reading)
+            self.assertIn('Setup.cmd',result['detail'])
     def test_account_change_discards_old_reading(self):
         with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(c,'DATA',pathlib.Path(folder)),patch.object(c,'executable',return_value='claude.exe'),patch.object(c.subprocess,'run',return_value=SimpleNamespace(stdout='{"loggedIn":true,"authMethod":"claude.ai","email":"new@example.test"}')),patch.object(c,'read_panel',return_value={'status':'Unavailable','detail':'failed'}):
             (pathlib.Path(folder)/'claude-cli.json').write_text(json.dumps({'identity':'different','checked':time.time(),'reading':{'status':'CLI','at':time.time(),'windows':[{'remaining':90}]}}))

@@ -182,6 +182,10 @@ def collect():
         return {**previous,'scope':scope_id(DATA,'claude',identity)}
     try:
         reading = read_panel(exe)
+    except ImportError:
+        # Missing terminal libraries are a setup problem, not a Claude outage: say so, and do not
+        # cache it, so the next refresh recovers as soon as Setup has installed them.
+        return {'status': 'Unavailable', 'detail': 'Python terminal libraries are missing. Run Setup.cmd in the Prism folder, then refresh.'}
     except Exception:
         reading = {'status': 'Unavailable', 'detail': 'Claude CLI terminal could not be read. Run Setup and check the Claude CLI connection.'}
     # Authentication may change while the interactive panel is being collected.
