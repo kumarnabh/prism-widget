@@ -1,5 +1,13 @@
 # Pre-publication review
 
+## 2.1.2 Claude usage tracking — 2026-10-11
+
+Claude usage was unavailable on a signed-in Pro account: the Claude CLI adapter set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which also blocks the `/usage` request, so the panel showed only "Failed to load usage data" and the adapter misreported it as rejected startup options. The variable is no longer set (and is removed if inherited). A load failure is retried once with the panel's own retry key and reported as a load failure; genuine `Error:` screens keep the startup-option message. Reset times printed by `/usage` are now parsed as the next future occurrence (named zone when tz data exists, otherwise local time), restoring Claude reset countdowns and forecasts; window labels match case-insensitively.
+
+No provider host, credential, cache format, dependency, telemetry or privacy behavior changed. The adapter still only runs the built-in `/usage` command with tools, MCP and hooks disabled; it never sends a model prompt.
+
+Local validation: 63 Python tests (two new regressions) and three browser tests passed; Release build had no errors; the publication boundary check found nothing; the 509-entry package had zero boundary findings. A fresh extracted package passed the native checks (16 layouts, 480 resize transitions, 160 customized layouts, feature/forecast checks and HD export, 52 seconds). A live read against Claude Code 2.1.161 returned the 5-hour and 7-day windows with reset times; no account values or identity are recorded here. Gitleaks was not available on the local machine; the hosted full-history job and package checks are recorded with the release. Scans cannot guarantee detection of every secret. The C# sources changed only by version string; the Claude `/usage` screen format is owned by Claude Code and may change in future versions.
+
 ## 2.1.1 Cursor model display — 2026-10-06
 
 The Cursor summary previously used the smallest percentage across Included, Cursor models and Other models. The front card now selects the validated autoPercentUsed window explicitly, and compact/tray/taskbar displays share that selection. If the Cursor-model window is missing or expired, the summary is unknown rather than another category. All reported windows remain intact for details, per-window forecasts/alerts and history; their actual limiting allowance is unchanged. No provider request, credential reuse, cache format, sampling, dependency or privacy behavior changes.
