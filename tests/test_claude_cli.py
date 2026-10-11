@@ -11,6 +11,23 @@ class CliTests(unittest.TestCase):
     def test_subscription_windows_and_zero(self):
         screen='Current session\n████ 0% used\nResets 9pm\n\nCurrent week (all models)\n████ 100% used\nCurrent week (Sonnet only)\n10.5% used\n'
         self.assertEqual([w['remaining'] for w in c.parse_screen(screen)],[100,0,89.5])
+    def test_reset_times_are_parsed_as_future_local_timestamps(self):
+        import datetime
+        now=datetime.datetime(2026,10,11,18,0).astimezone().timestamp()
+        daily=c.parse_reset('Resets 10:49pm (Not/AZone)',now)
+        self.assertEqual(datetime.datetime.fromtimestamp(daily).strftime('%Y-%m-%d %H:%M'),'2026-10-11 22:49')
+        rolled=c.parse_reset('Resets 9am',now)
+        self.assertEqual(datetime.datetime.fromtimestamp(rolled).strftime('%Y-%m-%d %H:%M'),'2026-10-12 09:00')
+        weekly=c.parse_reset('Resets Oct 18, 4:29am (Asia/Calcutta)',now)
+        self.assertGreater(weekly,now)
+        for text in ('Resets 13pm','Resets Foo 40, 9am','no reset here'):
+            self.assertIsNone(c.parse_reset(text,now))
+        windows=c.parse_screen('Current session\n  2% used\n  Resets 10:49pm (Asia/Calcutta)\nCurrent week (all models)\n  0% used\n  Resets Oct 18, 4:29am (Asia/Calcutta)\n')
+        self.assertEqual([w['label'] for w in windows],['5-hour','7-day (all models)'])
+        self.assertTrue(all(w['reset'] for w in windows))
+    def test_usage_fetch_must_not_be_blocked_by_traffic_switch(self):
+        with patch.dict(c.os.environ,{'CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC':'1'}):
+            self.assertNotIn('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',c.environment())
     def test_cost_is_not_quota(self):
         self.assertEqual(c.parse_screen('Total cost: $0.00\nUsage: 0 input, 0 output\n'),[])
     def test_rejects_stale_error_and_invalid(self):

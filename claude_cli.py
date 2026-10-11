@@ -1,4 +1,5 @@
 """Read Claude Code's local /usage panel. Never send a model prompt or copy credentials."""
+import datetime
 import hashlib
 import json
 import os
@@ -27,7 +28,8 @@ def executable():
 
 def environment():
     env = os.environ.copy()
-    env['CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC'] = '1'
+    # This switch also blocks the usage request, so /usage fails with "Failed to load usage data".
+    env.pop('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC', None)
     env['CLAUDE_CODE_DISABLE_AUTO_UPDATE'] = '1'
     return env
 
@@ -41,6 +43,39 @@ def arguments(exe):
 
 def subscription_auth(auth):
     return isinstance(auth, dict) and auth.get('loggedIn') is True and auth.get('authMethod') in ('claude.ai', 'oauth')
+
+
+def parse_reset(section, now=None):
+    """Next occurrence of a panel line such as 'Resets 10:49pm (Asia/Calcutta)' or 'Resets Oct 18, 4:29am'."""
+    match = re.search(r'Resets?\s+(?:([A-Za-z]{3,9})\s+(\d{1,2}),?\s+)?(\d{1,2})(?::(\d{2}))?\s*([ap])m\b(?:\s*\(([^)\n]+)\))?', section, re.I)
+    if not match:
+        return None
+    now = time.time() if now is None else now
+    try:
+        try:
+            from zoneinfo import ZoneInfo
+            zone = ZoneInfo(match[6].strip()) if match[6] else None
+        except Exception:
+            zone = None  # The panel prints local time; fall back when tz data is unavailable.
+        zone = zone or datetime.datetime.now().astimezone().tzinfo
+        hour, minute = int(match[3]), int(match[4] or 0)
+        if not 1 <= hour <= 12 or minute > 59:
+            return None
+        hour = hour % 12 + (12 if match[5].lower() == 'p' else 0)
+        current = datetime.datetime.fromtimestamp(now, zone)
+        if match[1]:
+            month = datetime.datetime.strptime(match[1][:3], '%b').month
+            for year in (current.year, current.year + 1):
+                stamp = datetime.datetime(year, month, int(match[2]), hour, minute, tzinfo=zone).timestamp()
+                if stamp > now:
+                    return stamp
+            return None
+        stamp = current.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if stamp.timestamp() <= now:
+            stamp += datetime.timedelta(days=1)
+        return stamp.timestamp()
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def parse_screen(text):
@@ -59,8 +94,8 @@ def parse_screen(text):
         percentage = float(match[1])
         if not 0 <= percentage <= 100:
             continue
-        label = '5-hour' if item[1].lower() == 'current session' else item[1].replace('Current week', '7-day')
-        windows.append({'label': label, 'remaining': round(100-percentage if match[2].lower() == 'used' else percentage, 1), 'reset': None})
+        label = '5-hour' if item[1].lower() == 'current session' else re.sub('Current week', '7-day', item[1], flags=re.I)
+        windows.append({'label': label, 'remaining': round(100-percentage if match[2].lower() == 'used' else percentage, 1), 'reset': parse_reset(section)})
     return windows
 
 
@@ -82,6 +117,8 @@ def read_panel(exe):
     end = time.monotonic() + 26
     result = None
     stable = 0
+    failed = None
+    retried = False
     try:
         while time.monotonic() < end:
             try:
@@ -89,8 +126,18 @@ def read_panel(exe):
             except queue.Empty:
                 pass
             text = '\n'.join(screen.display)
-            if re.search(r'^\s*Error:', text, re.M):
+            if re.search(r'failed to (?:load|fetch)|unable to (?:load|fetch)', text, re.I):
+                # Transient load failures happen; retry once, then report the real cause.
+                failed = failed or time.monotonic()
+                if not retried and time.monotonic() - failed > 2:
+                    retried = True
+                    terminal.write('r')
+                elif time.monotonic() - failed > 8:
+                    return {'status': 'Unavailable', 'detail': 'Claude /usage could not load usage data. Check your connection and Claude sign-in.'}
+            elif re.search(r'^\s*Error:', text, re.M):
                 return {'status': 'Unavailable', 'detail': 'Claude CLI rejected its startup options. Check the installed CLI version.'}
+            else:
+                failed = None
             if re.search(r'trust this folder|trust the files|choose the text style|select.*theme|to change this later, run /theme|log in to Claude|sign in to Claude', text, re.I):
                 return {'status': 'Connect', 'detail': 'Finish one-time Claude CLI setup using Settings → Sign in to Claude.'}
             windows = parse_screen(text)
