@@ -1,5 +1,11 @@
 # Change log
 
+## Unreleased — Claude usage tracking fix
+
+- Claude `/usage` always failed ("rejected its startup options"): Prism set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which blocks the usage request. It is now removed from the Claude CLI environment.
+- A "Failed to load usage data" screen is retried once and reported as a load failure, not a startup-option error.
+- Reset times printed by `/usage` are now parsed, restoring reset countdowns and forecasts for Claude; window labels match case-insensitively.
+
 ## 2.1.1 — Cursor model display correction
 
 - Cursor card, compact grid, tray and taskbar now show Cursor models instead of the minimum of all model categories.
