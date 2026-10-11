@@ -5,7 +5,7 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Symptom | Check |
 | --- | --- |
 | Python not found | Install 64-bit Python 3.11–3.14 with launcher; check `py -3 --version` in a fresh terminal. A Store alias alone is not an interpreter. |
-| Terminal dependency error | Run Setup again. Never copy `.venv` or `vendor` from another machine/Python version. |
+| Terminal dependency error, or Claude says terminal libraries are missing | Run Setup.cmd in the Prism folder, then refresh. Never copy `.venv` or `vendor` from another machine/Python version. |
 | Access denied | Extract into a writable folder; close Prism before replacing binaries. Avoid Program Files/read-only shares. |
 | Missing .NET | Release ZIP includes .NET. Source builds need the .NET 8 SDK. |
 | GPU/disk rate is a dash | Wait for two sensor captures (about six seconds). Drivers/counters may not expose data; unsupported is never zero. See docs/SYSTEM-METRICS.md. |

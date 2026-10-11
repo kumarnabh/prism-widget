@@ -1,5 +1,11 @@
 # Pre-publication review
 
+## 2.1.3 Missing terminal libraries — 2026-10-11
+
+A 2.1.2 installation extracted without running Setup has no local environment, so the Claude adapter could not import `winpty`/`pyte`. The failure was reported as "terminal could not be read" and cached for five minutes, which hid the cause and delayed recovery after Setup. An import failure is now reported as missing Python terminal libraries with the Setup.cmd instruction, and is returned before the cache write, so the next refresh retries. Other failures keep the existing generic message, stale-reading handling and caching. The authentication before/after account check is unchanged for them.
+
+No provider host, credential, cache format, dependency, telemetry or privacy behavior changed. A regression test covers the message, no cache file, immediate retry and the provider-contract detail; the behavior was also reproduced with a system Python lacking the libraries. 64 Python tests passed locally. Package, native and hosted CI results are recorded with the release. Scans cannot guarantee detection of every secret.
+
 ## 2.1.2 Claude usage tracking — 2026-10-11
 
 Claude usage was unavailable on a signed-in Pro account: the Claude CLI adapter set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which also blocks the `/usage` request, so the panel showed only "Failed to load usage data" and the adapter misreported it as rejected startup options. The variable is no longer set (and is removed if inherited). A load failure is retried once with the panel's own retry key and reported as a load failure; genuine `Error:` screens keep the startup-option message. Reset times printed by `/usage` are now parsed as the next future occurrence (named zone when tz data exists, otherwise local time), restoring Claude reset countdowns and forecasts; window labels match case-insensitively.

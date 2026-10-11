@@ -1,5 +1,10 @@
 # Change log
 
+## 2.1.3 — Clear message when terminal libraries are missing
+
+- If Setup has not installed the Python terminal libraries, Claude now says so ("Run Setup.cmd in the Prism folder") instead of the generic "terminal could not be read".
+- That setup problem is no longer cached for five minutes, so Claude recovers on the next refresh once Setup has run.
+
 ## 2.1.2 — Claude usage tracking fix
 
 - Claude `/usage` always failed ("rejected its startup options"): Prism set `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, which blocks the usage request. It is now removed from the Claude CLI environment.
