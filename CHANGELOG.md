@@ -1,5 +1,21 @@
 # Change log
 
+## 2.2.0 — Premium glass interface
+
+- New app-wide dark glass theme: settings tabs are pills, and checkboxes, dropdowns, text fields, sliders, lists, menus, tooltips and scrollbars match the widget instead of stock light Windows controls.
+- Refined widget surface: deeper gradient glass with a top sheen, gradient edge, softer shadow, glossy meters, glowing usage rings, a drawn resize grip and tabular figures so live numbers do not shimmer.
+- Buttons gain hover, pressed, focus and disabled states. Primary actions (Save, Free selected RAM, Run Setup) use the accent gradient. Dialog actions are spaced and content-width rather than full-width bars.
+- Expanded dashboards anchor the status line to the bottom edge instead of leaving empty glass below the cards; Fit to content still shrinks to the cards.
+- Low-quota, capacity and reset alerts use the same styled, dismissible card as the reminder preview.
+
+### Fixes
+
+- Quota bars now redraw when only their colour changes (for example when a provider crosses the 25% or 10% threshold).
+- Provider cards return to their original border after hover instead of a dimmer one.
+- A malformed line in Codex local telemetry no longer discards older valid readings in the offline fallback.
+- Setup error messages no longer show garbled characters under Windows PowerShell 5.1.
+- Free RAM releases the process handles it opens while listing and trimming apps.
+
 ## 2.1.5 — Guided first-run setup
 
 - Opening Prism before setup now shows a setup window instead of running account collectors with missing dependencies. A verified receipt follows the current pinned requirements.

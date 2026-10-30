@@ -49,14 +49,16 @@ def codex_telemetry():
         for line in reversed(lines):
             try: data=json.loads(line)
             except ValueError: continue
-            payload=data.get('payload',{})
-            if payload.get('type')!='token_count' or not payload.get('rate_limits'): continue
+            # One malformed or partially written line must not discard older valid readings.
+            payload=data.get('payload') if isinstance(data,dict) else None
+            if not isinstance(payload,dict) or payload.get('type')!='token_count' or not isinstance(payload.get('rate_limits'),dict): continue
+            try: at=datetime.datetime.fromisoformat(str(data['timestamp']).replace('Z','+00:00')).timestamp()
+            except (KeyError,ValueError): continue
             raw=payload['rate_limits']; bucket={}
             for key in ('primary','secondary'):
                 w=raw.get(key)
-                if w: bucket[key]={'usedPercent':w.get('used_percent'),'resetsAt':w.get('resets_at'),'windowDurationMins':w.get('window_minutes')}
+                if isinstance(w,dict): bucket[key]={'usedPercent':w.get('used_percent'),'resetsAt':w.get('resets_at'),'windowDurationMins':w.get('window_minutes')}
             windows=normalize_codex({'rateLimits':bucket})
-            at=datetime.datetime.fromisoformat(data['timestamp'].replace('Z','+00:00')).timestamp()
             if windows and (newest is None or at>newest['at']):
                 newest={'status':'Recent' if time.time()-at<600 else 'Stale','source':'Codex local quota telemetry','at':at,'windows':windows}
             break

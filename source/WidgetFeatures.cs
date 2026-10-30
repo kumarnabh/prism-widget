@@ -130,16 +130,16 @@ public sealed partial class Widget
     readonly Dictionary<string,double> featureOpenTimes=new();
     Window FeatureWindow(string title,double width=660,double height=660)
     {
-        var opened=Stopwatch.StartNew();var dialog=new Window{Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var opened=Stopwatch.StartNew();var dialog=new Window{Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
         if(selftest)dialog.Loaded+=(_,_)=>featureOpenTimes[title+"-"+L.Language]=opened.Elapsed.TotalMilliseconds;return dialog;
     }
     static CheckBox Check(StackPanel panel,string label,bool value){var box=new CheckBox{Content=L.T(label),IsChecked=value,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,7,0,7)};panel.Children.Add(box);return box;}
-    static ComboBox Choose(StackPanel panel,string label,IEnumerable<object> values,object selected){panel.Children.Add(Text(label,12,Muted));var combo=new ComboBox{ItemsSource=values,SelectedItem=selected,Margin=new Thickness(0,6,0,14),Padding=new Thickness(7),Foreground=Brush("#142236"),Background=Brush("#EDF4FC")};System.Windows.Automation.AutomationProperties.SetName(combo,L.T(label));panel.Children.Add(combo);return combo;}
+    static ComboBox Choose(StackPanel panel,string label,IEnumerable<object> values,object selected){panel.Children.Add(Text(label,12,Muted));var combo=new ComboBox{ItemsSource=values,SelectedItem=selected,Margin=new Thickness(0,6,0,14),MinWidth=220};System.Windows.Automation.AutomationProperties.SetName(combo,L.T(label));panel.Children.Add(combo);return combo;}
     void ShowPreferences()
     {
         var dialog=FeatureWindow("Settings");var shell=new DockPanel{Margin=new Thickness(20)};dialog.Content=shell;
         var saveBar=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Right,Margin=new Thickness(0,12,0,0)};DockPanel.SetDock(saveBar,Dock.Bottom);shell.Children.Add(saveBar);
-        var tabs=new TabControl{Background=Brush("#121E30"),BorderBrush=Brush("#486079"),Foreground=Brush("#142236")};shell.Children.Add(tabs);
+        var tabs=new TabControl();shell.Children.Add(tabs);
         StackPanel Tab(string name){var panel=new StackPanel{Margin=new Thickness(16)};tabs.Items.Add(new TabItem{Header=L.T(name),Content=new ScrollViewer{Content=panel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto}});return panel;}
         var general=Tab("General");
         var trayCheck=Check(general,"Enable system tray",preferences.TrayEnabled);var startup=Check(general,"Start with Windows",StartupRegistration.Enabled);var snap=Check(general,"Snap to screen edges",preferences.SnapEdges);var hours=Check(general,"Use 24-hour time",preferences.Use24Hour);
@@ -154,7 +154,7 @@ public sealed partial class Widget
         foreach(string id in WidgetPreferences.ProviderIds){var box=Choose(rates,ProviderName(id),intervals.Cast<object>(),preferences.RefreshSeconds[id]);box.ItemStringFormat="{0} s";rateBoxes[id]=box;}
         var metrics=Tab("Metrics");metrics.Children.Add(Text("Choose visible metrics and their order. The compact grid uses the full order; the dashboard keeps paired system groups and orders AI cards.",12,Muted));
         var activeOnly=Check(metrics,"Only active AI subscriptions",preferences.ActiveProvidersOnly);metrics.Children.Add(Text("Active means a provider has quota windows. Prism cannot verify paid subscription entitlement. Stale readings remain marked stale.",11,Muted));
-        var ordered=preferences.MetricOrder.ToList();var enabled=preferences.VisibleMetrics.ToHashSet();var list=new ListBox{Height=275,Margin=new Thickness(0,12,0,12),Background=Brush("#1C2D43"),Foreground=new SolidColorBrush(Ink)};metrics.Children.Add(list);
+        var ordered=preferences.MetricOrder.ToList();var enabled=preferences.VisibleMetrics.ToHashSet();var list=new ListBox{Height=275,Margin=new Thickness(0,12,0,12)};metrics.Children.Add(list);
         void RenderMetrics(string? selected=null){list.Items.Clear();foreach(var id in ordered){var box=new CheckBox{Content=L.T(MetricName(id)),IsChecked=enabled.Contains(id),Foreground=new SolidColorBrush(Ink),Padding=new Thickness(6),Tag=id};box.Checked+=(_,_)=>enabled.Add(id);box.Unchecked+=(_,_)=>enabled.Remove(id);list.Items.Add(box);if(id==selected)list.SelectedItem=box;}}
         RenderMetrics();var move=new StackPanel{Orientation=Orientation.Horizontal};
         metrics.Children.Add(Button("Show all metrics","Show all metrics",()=>{foreach(var id in ordered)enabled.Add(id);RenderMetrics();}));metrics.Children.Add(Button("Hide all metrics","Hide all metrics",()=>{enabled.Clear();RenderMetrics();}));
@@ -166,8 +166,8 @@ public sealed partial class Widget
         var forecastCheck=Check(alerts,"Show capacity estimates",preferences.ForecastEnabled);var capacityCheck=Check(alerts,"Enable predictive alerts",preferences.CapacityAlerts);var historyCheck=Check(alerts,"Save local quota history",preferences.HistoryEnabled);alerts.Children.Add(Text("History stores quota windows and opaque account scopes locally for 30 days. Disabling recording preserves saved history.",11,Muted));alerts.Children.Add(Button("Usage history","Usage history",()=>{dialog.Close();ShowHistory();}));
         BuildProfileSettings(Tab("Profiles"),dialog);BuildUpdateSettings(Tab("Updates"),dialog);
         var status=Text("",11,Muted);DockPanel.SetDock(status,Dock.Bottom);shell.Children.Insert(1,status);
-        saveBar.Children.Add(Button("Cancel","Cancel",dialog.Close));
-        saveBar.Children.Add(Button("Save","Save",()=>{
+        var cancel=Button("Cancel","Cancel",dialog.Close);cancel.Padding=new Thickness(16,7,16,7);saveBar.Children.Add(cancel);
+        var saveSettings=Primary(Button("Save","Save",()=>{
             var next=preferences.Copy();next.TrayEnabled=trayCheck.IsChecked==true||startup.IsChecked==true;next.SnapEdges=snap.IsChecked==true;next.Use24Hour=hours.IsChecked==true;next.Language=languageIds[Math.Max(0,language.SelectedIndex)];next.Opacity=opacity.Value;
             next.ForecastEnabled=forecastCheck.IsChecked==true;next.CapacityAlerts=capacityCheck.IsChecked==true;next.LowQuotaEnabled=low.IsChecked==true;next.LowQuotaThreshold=threshold.SelectedItem is int value?value:20;next.HistoryEnabled=historyCheck.IsChecked==true;next.MetricOrder=ordered.ToList();next.VisibleMetrics=ordered.Where(enabled.Contains).ToList();
             next.ActiveProvidersOnly=activeOnly.IsChecked==true;next.MinimizeToTray=minimizeCheck.IsChecked==true;
@@ -178,10 +178,11 @@ public sealed partial class Widget
                 try{if((startup.IsChecked==true)!=StartupRegistration.Enabled)StartupRegistration.Set(startup.IsChecked==true);}catch{preferences.Save(SettingsPath);throw;}
                 preferences=next;RefreshForecasts(true);L.Set(next.Language);Opacity=next.Opacity;schedule.Reset();ConfigureTray();ApplyMetricPreferences();AdaptLayout();dialog.Close();
             }catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException){status.Text=L.T("Could not save settings. Check folder access or an existing startup registration.");}
-        }));
+        }));saveSettings.Padding=new Thickness(20,7,20,7);saveSettings.Margin=new Thickness(8,0,0,0);saveBar.Children.Add(saveSettings);
         if(selftest)dialog.Loaded+=(_,_)=>{
             dialog.UpdateLayout();var visual=(FrameworkElement)dialog.Content;
             var bitmap=new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Ceiling(visual.ActualWidth*2),(int)Math.Ceiling(visual.ActualHeight*2),192,192,PixelFormats.Pbgra32);
+            var background=new DrawingVisual();using(var drawing=background.RenderOpen())drawing.DrawRectangle(dialog.Background,null,new Rect(0,0,visual.ActualWidth,visual.ActualHeight));bitmap.Render(background);
             bitmap.Render(VectorSnapshot.Capture(visual));var png=new System.Windows.Media.Imaging.PngBitmapEncoder();png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
             using(var output=File.Create(System.IO.Path.Combine(Root,"preview-settings-"+L.Language+".png")))png.Save(output);
             dialog.Dispatcher.BeginInvoke(dialog.Close);

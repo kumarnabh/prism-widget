@@ -37,5 +37,12 @@ class QuotaTests(unittest.TestCase):
             f=pathlib.Path(folder)/'claude-feed.json'
             f.write_text(json.dumps({'at':time.time(),'rate_limits':{'five_hour':{'used_percentage':20,'resets_at':time.time()-1},'seven_day':{'used_percentage':100,'resets_at':time.time()+3600}}}))
             result=p.claude();self.assertEqual(len(result['windows']),1);self.assertEqual(result['windows'][0]['remaining'],0)
+    def test_malformed_telemetry_line_keeps_older_reading(self):
+        with tempfile.TemporaryDirectory(dir=TMP) as folder, patch.dict(p.os.environ,{'CODEX_HOME':folder}):
+            day=pathlib.Path(folder)/'sessions'/p.datetime.datetime.now().strftime('%Y/%m/%d');day.mkdir(parents=True)
+            valid={'timestamp':p.datetime.datetime.now(p.datetime.timezone.utc).isoformat(),'payload':{'type':'token_count','rate_limits':{'primary':{'used_percent':25,'window_minutes':300}}}}
+            broken={'payload':{'type':'token_count','rate_limits':{'primary':{'used_percent':10,'window_minutes':300}}}}
+            (day/'session.jsonl').write_text('\n'.join(json.dumps(line) for line in (valid,broken,[1,2],{'payload':'text'}))+'\n')
+            result=p.codex_telemetry();self.assertEqual(result['windows'][0]['remaining'],75)
 
 if __name__=='__main__': unittest.main()
