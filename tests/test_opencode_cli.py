@@ -123,10 +123,18 @@ class ConsoleTests(unittest.TestCase):
             self.assertNotIn('private-exception', json.dumps(oc.collect()))
 
     def test_missing_or_legacy_cli_keeps_legacy_go_key_support(self):
-        with patch.object(oc, 'executable', return_value=None), patch.object(oc.auto_sources, 'collect_account', return_value={'status': 'Live'}) as legacy:
-            self.assertEqual(oc.collect()['status'], 'Live'); legacy.assert_called_once_with('opencode')
+        reading = {'status': 'Live', 'at': time.time(), 'windows': [{'label': '5-hour', 'remaining': 50, 'reset': None}]}
+        with patch.object(oc, 'executable', return_value=None), patch.object(oc.auto_sources, 'collect_account', return_value=reading) as legacy:
+            self.assertEqual(oc.collect(), reading); legacy.assert_called_once_with('opencode')
         with patch.object(oc, 'run', return_value=b'1.19.5'), patch.object(oc.auto_sources, 'collect_account', return_value={'status': 'Connect'}) as legacy:
             self.assertEqual(oc.collect()['status'], 'Connect'); legacy.assert_called_once_with('opencode')
+
+    def test_missing_runtime_explains_setup_instead_of_rejected_legacy_signin(self):
+        for result in ({'status': 'Connect', 'detail': 'Sign-in needs attention.'}, {'status': 'Waiting', 'detail': 'Sign-in needs attention.'}, {'status': 'Unavailable'}):
+            with patch.object(oc, 'executable', return_value=None), patch.object(oc.auto_sources, 'collect_account', return_value=result):
+                value = oc.collect()
+                self.assertEqual(value['status'], 'Connect'); self.assertIn('Setup.cmd', value['detail'])
+                self.assertIn('OpenCode v2', value['detail']); self.assertNotIn('Sign-in needs attention', value['detail'])
 
     def test_registry_dispatch_and_disconnect_clear_both_caches(self):
         adapter = adapters()['opencode']

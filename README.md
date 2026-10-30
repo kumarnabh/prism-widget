@@ -45,7 +45,7 @@ Prism is an independent community project, not affiliated with OpenAI, Cursor, A
 1. Use **Windows 10/11 x64** and install [64-bit Python 3.11–3.14](https://www.python.org/downloads/windows/), including its launcher. Windows 11 is the locally tested platform.
 2. Download `Prism-<version>-win-x64.zip` and `SHA256SUMS.txt` from [Releases](https://github.com/kumarnabh/prism-widget/releases/latest). Compare the ZIP hash using `Get-FileHash .\Prism-<version>-win-x64.zip -Algorithm SHA256`.
 3. Extract into a writable folder, such as Documents. Keep the files together. Do not run inside the ZIP or install in Program Files.
-4. Double-click **Setup.cmd**. It creates a local `.venv`, installs pinned terminal dependencies and launches Prism. Internet is needed for this first dependency installation.
+4. Double-click **Setup.cmd**. It creates a local `.venv`, verifies pinned terminal dependencies, and offers OpenCode Console support before launching Prism. If you open Prism.exe first, it shows a setup window. Internet is needed for this first dependency installation.
 5. Open **⋯ → Connections** for your accounts. System readings work independently.
 
 The release includes .NET; no SDK or administrator access is needed. Executables are currently **unsigned**. Windows may show an unknown-publisher warning; verify the source and checksum before deciding whether to run it. Windows startup is off by default and can be enabled in Settings. Update checks are manual; downloads never install or replace files automatically.
@@ -70,7 +70,7 @@ OpenRouter is disabled by default. In Connections, enable it and separately allo
 
 ### OpenCode Console setup
 
-From the Prism folder, run `powershell -NoProfile -File .\scripts\install-opencode.ps1` to install a checksum-verified private OpenCode v2.2.2 runtime. This leaves your global CLI unchanged. Existing native v2 installations are also detected. Enable existing-sign-in reuse in Connections and refresh. If Console is not signed in, run `.\data\tools\opencode-v2\2.2.2\opencode.exe auth login opencode` first. Prism reads the three Go quota windows through OpenCode's own usage API without a model prompt. Credentials pass through stdin into a temporary private CLI database, removed after the check; caches contain only normalized quota and opaque account scopes. Free-model limits and Console spending budgets are not reported as Go quota. The legacy Go-key endpoint is retained when v2 is unavailable.
+Run **Setup.cmd** and accept OpenCode Console support to install a checksum-verified private OpenCode v2.2.2 runtime. Connections also offers a setup button. Re-running Setup verifies an existing runtime and preserves your settings/sign-ins. This leaves your global CLI unchanged. Existing native v2 installations are also detected. Enable existing-sign-in reuse in Connections and refresh. If Console is not signed in, run `.\data\tools\opencode-v2\2.2.2\opencode.exe auth login opencode` first. Prism reads the three Go quota windows through OpenCode's own usage API without a model prompt. Credentials pass through stdin into a temporary private CLI database, removed after the check; caches contain only normalized quota and opaque account scopes. Free-model limits and Console spending budgets are not reported as Go quota. The legacy Go-key endpoint is retained when v2 is unavailable.
 
 ## Readings and controls
 

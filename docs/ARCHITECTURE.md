@@ -2,7 +2,7 @@
 
 `App.cs` owns WPF, adaptive layout and dialogs. `SystemCapacity.cs` owns an independent background sensor worker and immutable normalized snapshots; the UI reads cached results every two seconds. Provider collection uses one hidden Python process per independently due provider on a five-second scheduler. Each tree has its own 45-second deadline and synchronous cancellation on close; each result updates the UI independently. Single-instance identity is per installation.
 
-`RuntimeSupport.cs` prefers `.venv/Scripts/python.exe`, with PATH fallback for older setups. Setup creates that isolated environment with pinned requirements. `doctor.py` checks dependencies without reading accounts or credentials.
+`RuntimeSupport.cs` gates normal startup on a local Python executable and a bounded versioned setup receipt matching the current requirements SHA-256. Missing, corrupt or stale setup opens a first-run setup window before provider workers start. Diagnostic/offline self-tests retain the Python fallback. Setup creates the isolated environment, verifies actual terminal imports, then writes the receipt atomically. Interactive Setup offers the private OpenCode runtime; noninteractive callers can request `-InstallOpenCode` or `-SkipOpenCode`. `doctor.py` checks dependencies without reading accounts or credentials.
 
 `providers.py` runs adapters concurrently and normalizes source, status, capture time and quota windows. `quota_cache.py` validates caches; `QuotaSnapshot.cs` independently validates the UI boundary. Missing/malformed/expired values cannot become full balances. The limiting valid window determines displayed capacity.
 

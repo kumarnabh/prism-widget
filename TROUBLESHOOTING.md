@@ -4,6 +4,7 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 
 | Symptom | Check |
 | --- | --- |
+| Finish setup window | Run Setup from this window or double-click Setup.cmd in the extracted folder. A missing/stale readiness receipt or local Python environment requires setup; copying a virtual environment is unsupported. |
 | Python not found | Install 64-bit Python 3.11–3.14 with launcher; check `py -3 --version` in a fresh terminal. A Store alias alone is not an interpreter. |
 | Terminal dependency error, or Claude says terminal libraries are missing | Run Setup.cmd in the Prism folder, then refresh. Never copy `.venv` or `vendor` from another machine/Python version. |
 | Access denied | Extract into a writable folder; close Prism before replacing binaries. Avoid Program Files/read-only shares. |
@@ -17,7 +18,7 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Quota is a dash | No valid window returned. Check sign-in, tooltip and Connections. Unknown means neither zero nor full. |
 | Codex stale | Active-account verification failed; historical data is unverified and cannot trigger alerts. Check CLI sign-in. |
 | Cursor unavailable | Use an individual plan, sign in again, enable reuse and refresh. Prism does not renew credentials. |
-| Go 403/unavailable with a working Console sign-in | Install the private OpenCode v2 runtime with `powershell -NoProfile -File .\scripts\install-opencode.ps1` from the Prism folder; enable existing-sign-in reuse and refresh. Your global v1 CLI is preserved. |
+| Go 403/unavailable with a working Console sign-in | Run Setup.cmd and accept OpenCode support; enable existing-sign-in reuse and refresh. Your global v1 CLI is preserved. |
 | OpenCode Console needs sign-in | Use `.\data\tools\opencode-v2\2.2.2\opencode.exe auth login opencode`, then refresh. Do not paste credentials into Prism. |
 | Console connected, Go quota unknown | Go allowance requires entitlement. Free-model limits and Console spending budgets are not Go quota; Prism leaves them unknown. |
 | Claude needs setup | Finish first-run setup and subscription login through Connect Claude CLI.cmd. API-key auth is not a subscription. |

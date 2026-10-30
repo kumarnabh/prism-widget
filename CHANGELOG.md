@@ -1,5 +1,12 @@
 # Change log
 
+## 2.1.5 — Guided first-run setup
+
+- Opening Prism before setup now shows a setup window instead of running account collectors with missing dependencies. A verified receipt follows the current pinned requirements.
+- Setup verifies terminal-library imports and offers OpenCode Console support in the same flow. Connections provides a setup shortcut. Account consent remains separate.
+- Missing OpenCode v2 now gives setup guidance instead of a misleading legacy-key sign-in error; valid legacy Go-key quota still works.
+- Re-running the OpenCode installer verifies the pinned binary without redownloading it. Unknown existing binaries are preserved; downloads and extraction are checksum-verified.
+
 ## 2.1.4 — OpenCode Console connection
 
 - Read Go allowance through OpenCode v2's Console usage API using the existing Console sign-in. The old Go API-key path remains available when v2 is absent.

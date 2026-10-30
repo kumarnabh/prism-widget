@@ -159,13 +159,20 @@ def parse_limits(payload):
     return auto_sources.parse_go({'usage': usage})
 
 
+def legacy_or_setup():
+    reading = auto_sources.collect_account('opencode')
+    if reading.get('windows'):
+        return reading
+    return {'status': 'Connect', 'detail': 'OpenCode v2 is missing or incompatible. For Console sign-in, run Setup.cmd and choose OpenCode support. Legacy Go-key quota is unavailable.'}
+
+
 def collect():
     if not auto_sources.enabled():
         return {'status': 'Connect', 'detail': 'Enable this account connection in Settings.'}
     exe = executable()
     if not exe:
         # Existing v1 Go API-key installations remain supported without a v2 runtime.
-        return auto_sources.collect_account('opencode')
+        return legacy_or_setup()
     DATA.mkdir(parents=True, exist_ok=True)
     path = DATA / 'opencode-cli.json'
     deadline = time.monotonic() + 37  # Native worker has an independent 45-second process-tree deadline.
@@ -174,7 +181,7 @@ def collect():
             folder = pathlib.Path(temporary)
             version = run(exe, ['--version'], folder, environment(folder, private=True), deadline, limit=1024)
             if not re.fullmatch(rb'(?:opencode\s+)?v?2\.\d+\.\d+(?:[-+][\w.-]+)?', version.strip()):
-                return auto_sources.collect_account('opencode')
+                return legacy_or_setup()
             auth, identity = export_auth(exe, folder, deadline)
             cached = {}
             try:

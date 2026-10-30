@@ -26,6 +26,17 @@ public static class FeatureChecks
     public static async Task<bool> Verify(string directory)
     {
         string root=Path.Combine(directory,"features-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string setupRoot=Path.Combine(root,"setup");Directory.CreateDirectory(Path.Combine(setupRoot,"data"));Directory.CreateDirectory(Path.Combine(setupRoot,".venv","Scripts"));
+        Require(!RuntimeSupport.Ready(setupRoot),"setup blocks missing runtime");
+        File.WriteAllText(Path.Combine(setupRoot,".venv","Scripts","python.exe"),"synthetic runtime marker");File.WriteAllText(Path.Combine(setupRoot,"requirements.txt"),"synthetic requirements");
+        Require(!RuntimeSupport.Ready(setupRoot),"setup blocks missing receipt");
+        string setupReceipt=Path.Combine(setupRoot,"data","runtime-ready.json");File.WriteAllText(setupReceipt,"[]");Require(!RuntimeSupport.Ready(setupRoot),"setup corrupt receipt fails closed");
+        string requirementsHash=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(setupRoot,"requirements.txt"))));
+        File.WriteAllText(setupReceipt,JsonSerializer.Serialize(new{schema=1,terminalDependencies=true,requirementsSha256=requirementsHash}));Require(RuntimeSupport.Ready(setupRoot),"setup verified receipt unlocks startup");
+        File.AppendAllText(Path.Combine(setupRoot,"requirements.txt"),"changed");Require(!RuntimeSupport.Ready(setupRoot),"dependency changes require setup");
+        File.Delete(Path.Combine(setupRoot,".venv","Scripts","python.exe"));Require(!RuntimeSupport.Ready(setupRoot),"removed runtime requires setup");
+        File.Delete(setupReceipt);File.Delete(Path.Combine(setupRoot,"requirements.txt"));
+        Directory.Delete(Path.Combine(setupRoot,".venv","Scripts"));Directory.Delete(Path.Combine(setupRoot,".venv"));Directory.Delete(Path.Combine(setupRoot,"data"));Directory.Delete(setupRoot);
         var now=DateTimeOffset.UtcNow;
         var prefs=new WidgetPreferences{MetricOrder=new(){"claude","bad","claude"},VisibleMetrics=new(),Language="invalid",Opacity=9,RefreshSeconds=new(){{"codex",1},{"cursor",99999}}};
         prefs.Normalize();Require(prefs.MetricOrder.Count==WidgetPreferences.MetricIds.Length&&prefs.MetricOrder[0]=="claude"&&prefs.VisibleMetrics.Count==0&&prefs.Language=="en"&&prefs.Opacity==1,"settings sanitization");

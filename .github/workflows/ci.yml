@@ -40,6 +40,8 @@ jobs:
       - name: Build and native offline verification
         shell: pwsh
         run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./Setup.ps1 -SkipLaunch -SkipOpenCode
+          if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
           ./Build.ps1 -SkipDependencies
           # The expanded translated secondary-view exports approach 60s on hosted VMs.
           # Keep every assertion and a finite deadline; local default remains 60s.
