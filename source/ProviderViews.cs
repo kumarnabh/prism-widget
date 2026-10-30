@@ -89,7 +89,7 @@ public sealed partial class Widget
         var settings=LocalJson.Load<Dictionary<string,bool>>(Path.Combine(Data,"connections.json"))??new();
         var allow=Check(panel,"Allow existing OpenRouter environment sign-in",settings.GetValueOrDefault("allowOpenRouter"));
         var status=Text("",12,Muted);panel.Children.Add(status);
-        panel.Children.Add(Button("Save","Save",()=>{try{settings["allowOpenRouter"]=allow.IsChecked==true;LocalJson.Save(Path.Combine(Data,"connections.json"),settings);CancelProvider("openrouter");providerData.Remove("openrouter");schedule.Reset();dialog.Close();}catch(IOException){status.Text=L.T("Could not save settings. Check folder access.");}catch(UnauthorizedAccessException){status.Text=L.T("Could not save settings. Check folder access.");}}));
+        panel.Children.Add(Primary(Button("Save","Save",()=>{try{settings["allowOpenRouter"]=allow.IsChecked==true;LocalJson.Save(Path.Combine(Data,"connections.json"),settings);CancelProvider("openrouter");providerData.Remove("openrouter");schedule.Reset();dialog.Close();}catch(IOException){status.Text=L.T("Could not save settings. Check folder access.");}catch(UnauthorizedAccessException){status.Text=L.T("Could not save settings. Check folder access.");}})));
         CaptureFeature(dialog,"openrouter");dialog.ShowDialog();
     }
     async Task UpdateProvider(string id)

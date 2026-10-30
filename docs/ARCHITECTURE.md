@@ -10,7 +10,7 @@
 
 `WorldClocks.cs` uses Windows timezone conversion. `ResetReminders.cs` checks >10%, freshness and known reset boundaries, with persistent bounded deduplication. WPF shows a short popup. Settings may scroll; the dashboard does not.
 
-Glass, meters and charts use WPF vectors; `VectorSnapshot` outlines glyphs for HD export. A shared action-row component switches between labels and icons. Compact charts require a fresh measurement of the complete grid before becoming visible. Offline checks exercise eight sizes with clocks on/off, 480 forward/reverse breakpoint transitions, disconnected account fixtures and real system sensors.
+`Theme.cs` installs application-wide implicit styles so every dialog's standard controls (tabs, check boxes, combo boxes, text boxes, sliders, lists, menus, tooltips, scroll bars) share the widget's dark glass look; it falls back to stock controls if the dictionary cannot load. Glass, meters and charts use WPF vectors; `VectorSnapshot` outlines glyphs for HD export. A shared action-row component switches between labels and icons. Compact charts require a fresh measurement of the complete grid before becoming visible. Offline checks exercise eight sizes with clocks on/off, 480 forward/reverse breakpoint transitions, disconnected account fixtures and real system sensors.
 
 Git ignores runtime state. A staged checker rejects private paths/patterns, and packaging copies only explicitly named files into a fresh self-contained publish directory. See privacy/release docs before adding adapters or changing packaging.
 

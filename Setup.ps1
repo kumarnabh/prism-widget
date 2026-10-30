@@ -16,7 +16,7 @@ if(-not (Test-Path -LiteralPath $python)){
         try{$info=$probe | ConvertFrom-Json}catch{continue}
         if($info[1][0] -eq 3 -and $info[1][1] -ge 11 -and $info[1][1] -le 14 -and $info[2] -eq 64){$candidate=$info[0];break}
     }
-    if(-not $candidate){throw 'Install 64-bit Python 3.11–3.14 from python.org (include the Python launcher), then run Setup again.'}
+    if(-not $candidate){throw 'Install 64-bit Python 3.11-3.14 from python.org (include the Python launcher), then run Setup again.'}
     & $candidate -m venv (Join-Path $prismRoot '.venv')
     if($LASTEXITCODE -ne 0){throw 'Could not create the local Python environment. Extract Prism to a writable folder.'}
 }
@@ -24,7 +24,7 @@ if(-not (Test-Path -LiteralPath $python)){
 if($LASTEXITCODE -ne 0){throw 'Dependency installation failed. Check your network and retry Setup.'}
 $verifyCode="import sys,struct,winpty,pyte,wcwidth; assert (3,11)<=sys.version_info[:2]<=(3,14) and struct.calcsize('P')==8"
 & $python -c $verifyCode
-if($LASTEXITCODE -ne 0){throw 'The local Python environment is incomplete. Check Python 3.11–3.14 x64 and retry Setup.'}
+if($LASTEXITCODE -ne 0){throw 'The local Python environment is incomplete. Check Python 3.11-3.14 x64 and retry Setup.'}
 $dataRoot=Join-Path $prismRoot 'data'
 New-Item -ItemType Directory -Force -Path $dataRoot | Out-Null
 $receipt=Join-Path $dataRoot 'runtime-ready.json'

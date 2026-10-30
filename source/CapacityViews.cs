@@ -36,7 +36,7 @@ public sealed partial class Widget
         var now=DateTimeOffset.UtcNow;if(!notifications.Available(now)||messages.Count==0)return false;
         bool sent;
         if(!IsVisible||WindowState==WindowState.Minimized)sent=tray?.Notify(L.T(title),string.Join("\n",messages))==true;
-        else{DismissReminder();var stack=new StackPanel();stack.Children.Add(Text(title,14));foreach(var message in messages.Take(3))stack.Children.Add(Text(message,12));var panel=Panel(stack,"#F02A344A",14);panel.Width=310;panel.ToolTip=string.Join("\n",messages);reminderPopup.Child=panel;reminderPopup.IsOpen=true;reminderTimer.Start();sent=true;}
+        else{DismissReminder();reminderPopup.Child=ReminderContent(messages,false,title);reminderPopup.IsOpen=true;reminderTimer.Start();sent=true;}
         if(sent){notifications.Mark(now);SaveNotifications();}return sent;
     }
     void SaveNotifications(){try{LocalJson.Save(System.IO.Path.Combine(Data,"notification-state.json"),notifications);}catch(IOException){}catch(UnauthorizedAccessException){}}
@@ -78,7 +78,7 @@ public sealed partial class Widget
     void ShowTrayCapacity()
     {
         if(trayView is not null){trayView.Activate();return;}
-        var window=new Window{Title="Prism · "+L.T("Capacity"),Width=340,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-24,WindowStyle=WindowStyle.ToolWindow,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,Background=Brush("#17273D"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var window=new Window{Title="Prism · "+L.T("Capacity"),Width=340,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-24,WindowStyle=WindowStyle.ToolWindow,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(18)};window.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("PRISM",20));
         var system=Text("",16);stack.Children.Add(system);
         var list=new StackPanel();stack.Children.Add(list);

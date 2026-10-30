@@ -26,7 +26,7 @@ public class App : Application
         string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
         using var instance=diagnostic?null:new System.Threading.Mutex(true,"Local\\PrismWidget_"+identity,out created);
         if(!created){ActivateExisting(identity);return;}
-        var app = new App();
+        var app = new App();Theme.Install(app);
         L.Set(diagnostic?"en":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).Language);
         app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true;if(diagnostic)app.Shutdown(1); };
         if(!diagnostic&&!RuntimeSupport.Ready(AppContext.BaseDirectory)){app.Run(RuntimeSupport.SetupWindow(AppContext.BaseDirectory));return;}
@@ -77,6 +77,7 @@ public sealed partial class Widget : Window
     Sparkline cpuGraph=null!,ramGraph=null!;
     bool adapting;
     int density;
+    double footerSlack;
     readonly TextBlock cpuValue=Text("—",38), ramValue=Text("—",38), ramDetail=Text("Reading memory",11,Muted), diskValue=Text("—",14), netValue=Text("—",14);
     readonly TextBlock clock=Text("",21), footer=Text("Connecting to your workspace",10,Muted);
 
@@ -109,16 +110,6 @@ public sealed partial class Widget : Window
         MinWidth=340; MinHeight=220; MaxWidth=SystemParameters.WorkArea.Width;
         UseLayoutRounding=true;SnapsToDevicePixels=true;TextOptions.SetTextFormattingMode(this,TextFormattingMode.Display);
         FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI"); Foreground=new SolidColorBrush(Ink);
-        Resources.Add(typeof(ScrollBar),(Style)XamlReader.Parse("""
-        <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="ScrollBar">
-          <Setter Property="Width" Value="8"/><Setter Property="Background" Value="#162235"/>
-          <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
-            <Border Background="{TemplateBinding Background}" CornerRadius="4"><Track x:Name="PART_Track" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" IsDirectionReversed="True" Orientation="Vertical">
-              <Track.Thumb><Thumb><Thumb.Template><ControlTemplate TargetType="Thumb"><Border Background="#536780" CornerRadius="4" Margin="1"/></ControlTemplate></Thumb.Template></Thumb></Track.Thumb>
-            </Track></Border>
-          </ControlTemplate></Setter.Value></Setter>
-        </Style>
-        """));
         WindowStartupLocation=WindowStartupLocation.Manual;
         Left=SystemParameters.WorkArea.Right-Width-24; Top=SystemParameters.WorkArea.Top+24;
         MaxHeight=SystemParameters.WorkArea.Height-24;
@@ -145,22 +136,54 @@ public sealed partial class Widget : Window
         };
     }
     static SolidColorBrush Brush(string hex)=>new((Color)ColorConverter.ConvertFromString(hex));
-    static TextBlock Text(string value,double size=12,Color? color=null){var text=new TextBlock{Text=L.T(value),FontSize=size,Foreground=new SolidColorBrush(color??Ink),TextWrapping=TextWrapping.Wrap,FontWeight=size>=18?FontWeights.Medium:FontWeights.Normal};if(L.Known(value))text.SetResourceReference(TextBlock.TextProperty,"t."+value);return text;}
-    static Meter Bar(string color)=>new(){Height=4,Foreground=Brush(color),Background=Brush("#26354A"),Margin=new Thickness(0,9,0,0)};
+    static TextBlock Text(string value,double size=12,Color? color=null)
+    {
+        var text=new TextBlock{Text=L.T(value),FontSize=size,Foreground=new SolidColorBrush(color??Ink),TextWrapping=TextWrapping.Wrap,FontWeight=size>=18?FontWeights.Medium:FontWeights.Normal};
+        // Fixed-width digits keep live readings from shimmering as values change.
+        if(size>=14)System.Windows.Documents.Typography.SetNumeralAlignment(text,FontNumeralAlignment.Tabular);
+        if(L.Known(value))text.SetResourceReference(TextBlock.TextProperty,"t."+value);return text;
+    }
+    static Meter Bar(string color)=>new(){Height=4,Foreground=Brush(color),Background=Brush("#2A3A52"),Margin=new Thickness(0,9,0,0)};
+    static readonly ControlTemplate ButtonTemplate=(ControlTemplate)XamlReader.Parse("""
+        <ControlTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="Button">
+          <Grid>
+            <Border x:Name="face" CornerRadius="9" BorderThickness="1" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"/>
+            <Border x:Name="sheen" CornerRadius="9" Background="#FFFFFF" Opacity="0" IsHitTestVisible="False"/>
+            <ContentPresenter Margin="{TemplateBinding Padding}" HorizontalAlignment="Center"/>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="sheen" Property="Opacity" Value=".11"/><Setter TargetName="face" Property="BorderBrush" Value="#A6BEE6"/></Trigger>
+            <Trigger Property="IsPressed" Value="True"><Setter TargetName="sheen" Property="Opacity" Value=".03"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="face" Property="BorderBrush" Value="#6AF5E2"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+        """);
+    static Brush Gradient(Color from,Color to,double angle){var brush=new LinearGradientBrush(from,to,angle);brush.Freeze();return brush;}
+    static readonly Brush ButtonFill=Gradient(Color.FromArgb(235,46,72,106),Color.FromArgb(235,31,49,76),90),ButtonEdge=Gradient(Color.FromArgb(200,132,160,204),Color.FromArgb(150,72,96,134),90);
+    static readonly Brush PrimaryFill=Gradient(Color.FromRgb(106,245,226),Color.FromRgb(169,155,255),0),PrimaryEdge=Gradient(Color.FromRgb(196,255,247),Color.FromRgb(204,193,255),0);
+    static readonly Brush PanelEdge=Gradient(Color.FromArgb(150,164,196,236),Color.FromArgb(70,96,120,166),65);
+    static Button Primary(Button b){b.Background=PrimaryFill;b.BorderBrush=PrimaryEdge;b.Foreground=Brush("#0E1A2A");b.FontWeight=FontWeights.SemiBold;return b;}
     static Button Button(string text,string tip,Action click)
     {
-        var b=new Button {Content=L.T(text),ToolTip=L.T(tip),Foreground=new SolidColorBrush(Ink),Background=Brush("#253A54"),BorderBrush=Brush("#657E9F"),BorderThickness=new Thickness(1),Padding=new Thickness(9,5,9,5),Cursor=Cursors.Hand,FontSize=12,Margin=new Thickness(4,0,0,0)};
+        var b=new PrismButton {Content=L.T(text),ToolTip=L.T(tip),Foreground=new SolidColorBrush(Ink),Background=ButtonFill,BorderBrush=ButtonEdge,BorderThickness=new Thickness(1),Padding=new Thickness(9,5,9,5),Cursor=Cursors.Hand,FontSize=12,Margin=PrismButton.RowMargin,Template=ButtonTemplate};
         if(L.Known(text))b.SetResourceReference(ContentControl.ContentProperty,"t."+text);
-        var template=new ControlTemplate(typeof(Button));
-        var border=new FrameworkElementFactory(typeof(Border)); border.SetValue(Border.CornerRadiusProperty,new CornerRadius(8));
-        border.SetBinding(Border.BackgroundProperty,new System.Windows.Data.Binding("Background"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent});
-        border.SetBinding(Border.BorderBrushProperty,new System.Windows.Data.Binding("BorderBrush"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent}); border.SetValue(Border.BorderThicknessProperty,new Thickness(1));
-        var content=new FrameworkElementFactory(typeof(ContentPresenter));content.SetBinding(FrameworkElement.MarginProperty,new System.Windows.Data.Binding("Padding"){RelativeSource=System.Windows.Data.RelativeSource.TemplatedParent});content.SetValue(FrameworkElement.HorizontalAlignmentProperty,HorizontalAlignment.Center);
-        border.AppendChild(content); template.VisualTree=border; b.Template=template;
         System.Windows.Automation.AutomationProperties.SetName(b,tip);ToolTipService.SetInitialShowDelay(b,250);
-        b.Click+=(_,_)=>click();b.MouseEnter+=(_,_)=>b.Background=Brush("#3B5778");b.MouseLeave+=(_,_)=>b.Background=Brush("#253A54");return b;
+        b.Click+=(_,_)=>click();return b;
     }
-    static Border Panel(UIElement child,string color="#85324A66",int radius=18)=>new(){Background=new LinearGradientBrush(Brush(color).Color,Color.FromArgb(95,30,37,64),70),BorderBrush=Brush("#68869EBE"),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
+    /// <summary>Widget rows keep compact pills; vertical dialog stacks get spaced, content-width actions.</summary>
+    sealed class PrismButton : System.Windows.Controls.Button
+    {
+        public static readonly Thickness RowMargin=new(4,0,0,0);
+        protected override void OnVisualParentChanged(DependencyObject oldParent)
+        {
+            base.OnVisualParentChanged(oldParent);
+            if(VisualParent is not StackPanel{Orientation:Orientation.Vertical})return;
+            if(Margin==RowMargin)Margin=new Thickness(0,5,0,5);
+            if(Padding==new Thickness(9,5,9,5))Padding=new Thickness(14,7,14,7);
+            if(ReadLocalValue(HorizontalAlignmentProperty)==DependencyProperty.UnsetValue)HorizontalAlignment=HorizontalAlignment.Left;
+        }
+    }
+    static Border Panel(UIElement child,string color="#85324A66",int radius=18)=>new(){Background=new LinearGradientBrush(Brush(color).Color,Color.FromArgb(95,30,37,64),70),BorderBrush=PanelEdge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
     void SetPinned(bool value){Topmost=value;pin.Content=metricPin.Content=value?"◆":"◇";}
     sealed class ActionRow
     {
@@ -173,7 +196,7 @@ public sealed partial class Widget : Window
             var button=Button("",tip,action);var content=new StackPanel{Orientation=Orientation.Horizontal};
             content.Children.Add(new System.Windows.Shapes.Path{Data=Geometry.Parse(icon),Stroke=new SolidColorBrush(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center});
             var text=Text(label,12);text.TextWrapping=TextWrapping.NoWrap;text.Margin=new Thickness(6,0,0,0);text.VerticalAlignment=VerticalAlignment.Center;content.Children.Add(text);labels.Add(text);
-            button.Content=content;button.IsEnabledChanged+=(_,_)=>button.Opacity=button.IsEnabled?1:.45;
+            button.Content=content;
             Buttons.Add(button);Element.Children.Add(button);return button;
         }
         public void SetIconsOnly(bool value){IconsOnly=value;foreach(var label in labels)label.Visibility=value?Visibility.Collapsed:Visibility.Visible;}
@@ -205,7 +228,7 @@ public sealed partial class Widget : Window
     {
         var button=Button("···","More controls",()=>{});
         button.Click+=(_,_)=>{
-            var menu=new ContextMenu{Background=Brush("#162235"),Foreground=new SolidColorBrush(Ink),BorderBrush=Brush("#486079"),Padding=new Thickness(6)};
+            var menu=new ContextMenu();
             void Item(string label,string shortcut,Action action){var item=new MenuItem{Header=L.T(label),InputGestureText=shortcut,Padding=new Thickness(10,6,10,6)};item.Click+=(_,_)=>action();menu.Items.Add(item);}
             Item(Topmost?"Unpin widget":"Keep on top","Ctrl+P",()=>SetPinned(!Topmost));
             Item("Fit to content","",FitHeight);Item("Toggle compact view","Ctrl+M",ToggleCompact);
@@ -235,14 +258,20 @@ public sealed partial class Widget : Window
     {
         var outer=new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Padding=new Thickness(21),BorderThickness=new Thickness(1)};frame=outer;
         outer.Background=Brushes.Transparent;
-        outer.BorderBrush=new LinearGradientBrush(Brush("#D4C1F5FF").Color,Brush("#688796CC").Color,45);
+        var edge=new LinearGradientBrush{StartPoint=new Point(0,0),EndPoint=new Point(1,1)};
+        edge.GradientStops.Add(new GradientStop(Brush("#E6D2FBFF").Color,0));edge.GradientStops.Add(new GradientStop(Brush("#5A7FA3CC").Color,.45));edge.GradientStops.Add(new GradientStop(Brush("#9AB49CFF").Color,1));
+        outer.BorderBrush=edge;
         fittedBody.Child=body;outer.Child=fittedBody;
         var surface=new Grid();
-        surface.Children.Add(new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Background=Brush("#182538"),IsHitTestVisible=false,Effect=new DropShadowEffect{Color=Colors.Black,BlurRadius=18,ShadowDepth=4,Opacity=.4}});
+        surface.Children.Add(new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Background=Brush("#101C30"),IsHitTestVisible=false,Effect=new DropShadowEffect{Color=Color.FromRgb(4,6,18),BlurRadius=20,ShadowDepth=5,Direction=270,Opacity=.55}});
         surface.Children.Add(new GlassSurface{Margin=new Thickness(10)});
         surface.Children.Add(outer);Content=surface;
         var grip=new Thumb{Width=22,Height=22,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,15,15),Cursor=Cursors.SizeNWSE,ToolTip="Drag to resize · double-click to fit height"};
-        var gripTemplate=new ControlTemplate(typeof(Thumb));var glyph=new FrameworkElementFactory(typeof(TextBlock));glyph.SetValue(TextBlock.TextProperty,"◢");glyph.SetValue(TextBlock.ForegroundProperty,Brush("#889AB5"));glyph.SetValue(TextBlock.FontSizeProperty,18d);gripTemplate.VisualTree=glyph;grip.Template=gripTemplate;
+        var gripTemplate=new ControlTemplate(typeof(Thumb));var glyph=new FrameworkElementFactory(typeof(System.Windows.Shapes.Path));
+        glyph.SetValue(System.Windows.Shapes.Path.DataProperty,Geometry.Parse("M18,7 L7,18 M18,12 L12,18 M18,17 L17,18"));glyph.SetValue(System.Windows.Shapes.Shape.StrokeProperty,Brush("#8FA4C4"));
+        glyph.SetValue(System.Windows.Shapes.Shape.StrokeThicknessProperty,1.5);glyph.SetValue(System.Windows.Shapes.Shape.StrokeStartLineCapProperty,PenLineCap.Round);glyph.SetValue(System.Windows.Shapes.Shape.StrokeEndLineCapProperty,PenLineCap.Round);
+        var hitArea=new FrameworkElementFactory(typeof(Border));hitArea.SetValue(Border.BackgroundProperty,Brushes.Transparent);hitArea.AppendChild(glyph);
+        gripTemplate.VisualTree=hitArea;grip.Template=gripTemplate;
         grip.DragDelta+=(_,e)=>{Width=Math.Clamp(ActualWidth+e.HorizontalChange,MinWidth,MaxWidth);Height=Math.Clamp(ActualHeight+e.VerticalChange,MinHeight,MaxHeight);};
         grip.MouseDoubleClick+=(_,_)=>FitHeight();surface.Children.Add(grip);
         var header=Columns(-1,0);fullHeader=header;header.ColumnDefinitions[1].Width=GridLength.Auto;
@@ -393,10 +422,16 @@ public sealed partial class Widget : Window
                 if(body.DesiredSize.Height<=availableHeight)break;
             }
             if(body.DesiredSize.Height>height-22-frame.Padding.Top*2){adapting=false;AdaptLayout(true);return;}
+            // Anchor the status lines to the bottom edge rather than leaving empty glass below the cards.
+            // Measure() skips descendants whose own measure is still cached, so refresh the subtree for an exact height.
+            InvalidateMeasureTree(body);body.Measure(new Size(body.Width,double.PositiveInfinity));
+            double slack=height-22-frame.Padding.Top*2-body.DesiredSize.Height;footerSlack=slack>24?Math.Floor(slack-4):0;
+            if(footerSlack>0){bottom.Margin=new Thickness(0,bottom.Margin.Top+footerSlack,0,0);InvalidateMeasureTree(body);body.Measure(new Size(body.Width,double.PositiveInfinity));}
             cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);
         }finally{adapting=false;}
     }
-    void FitHeight(){AdaptLayout();Height=Math.Clamp(body.DesiredSize.Height+22+frame.Padding.Top*2,metricsOnly?MinHeight:Math.Max(MinHeight,640),MaxHeight);}
+    static void InvalidateMeasureTree(DependencyObject node){if(node is UIElement element)element.InvalidateMeasure();for(int i=0;i<VisualTreeHelper.GetChildrenCount(node);i++)InvalidateMeasureTree(VisualTreeHelper.GetChild(node,i));}
+    void FitHeight(){AdaptLayout();Height=Math.Clamp(body.DesiredSize.Height-(metricsOnly?0:footerSlack)+22+frame.Padding.Top*2,metricsOnly?MinHeight:Math.Max(MinHeight,640),MaxHeight);}
     void ToggleCompact(){if(compact||metricsOnly){RestoreDetails();}else{expandedHeight=Height;compact=true;AdaptLayout();FitHeight();}}
     void LoadPosition()
     {
@@ -452,16 +487,16 @@ public sealed partial class Widget : Window
         try{resetReminders.Save(System.IO.Path.Combine(Data,"reset-reminders.json"));}catch(Exception e) when(e is IOException or UnauthorizedAccessException){}
     }
     void DismissReminder(){reminderTimer.Stop();reminderPopup.IsOpen=false;}
-    Border ReminderContent(IReadOnlyList<string> messages,bool isPreview)
+    Border ReminderContent(IReadOnlyList<string> messages,bool isPreview,string heading="Quota resets soon")
     {
         var content=new StackPanel();var header=Columns(-1,30);
-        var title=Text(isPreview?"Preview · Quota resets soon":"Quota resets soon",14);title.Foreground=Brush("#FFE0A1");title.FontWeight=FontWeights.SemiBold;title.VerticalAlignment=VerticalAlignment.Center;Add(header,title,0);
-        var dismiss=Button("×","Dismiss reset reminder",DismissReminder);dismiss.Padding=new Thickness(5,2,5,2);Add(header,dismiss,1);content.Children.Add(header);
+        var title=Text(isPreview?"Preview · Quota resets soon":heading,14);title.Foreground=Brush("#FFE0A1");title.FontWeight=FontWeights.SemiBold;title.VerticalAlignment=VerticalAlignment.Center;Add(header,title,0);
+        var dismiss=Button("×",heading=="Quota resets soon"?"Dismiss reset reminder":"Dismiss",DismissReminder);dismiss.Padding=new Thickness(5,2,5,2);Add(header,dismiss,1);content.Children.Add(header);
         foreach(string message in messages.Take(3)){var line=Text(message,12);line.Margin=new Thickness(0,8,0,0);content.Children.Add(line);}
         if(messages.Count>3){var more=Text($"+ {messages.Count-3} more windows · hover for details",11,Muted);more.Margin=new Thickness(0,8,0,0);content.Children.Add(more);}
         var panel=Panel(content,"#F02A344A",14);panel.Width=310;panel.Padding=new Thickness(14);panel.BorderBrush=Brush("#C2E8BD77");panel.ToolTip=string.Join("\n",messages);
         System.Windows.Documents.TextElement.SetFontFamily(panel,FontFamily);
-        System.Windows.Automation.AutomationProperties.SetName(panel,(isPreview?"Preview. ":"")+"Quota resets soon. "+string.Join(". ",messages));
+        System.Windows.Automation.AutomationProperties.SetName(panel,(isPreview?"Preview. ":"")+L.T(heading)+". "+string.Join(". ",messages));
         return panel;
     }
     void ShowReminder(IReadOnlyList<string> messages,bool isPreview)
@@ -470,12 +505,12 @@ public sealed partial class Widget : Window
     }
     void ShowResetReminders()
     {
-        var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("A nudge before the reset",23));
         var info=Text("Show a quiet, 12-second reminder when a quota window is about to reset and more than 10% remains. Each window alerts once per reset, even across restarts.",12,Muted);info.Margin=new Thickness(0,12,0,18);stack.Children.Add(info);
         var enabled=new CheckBox{Content=L.T("Enable reset reminders"),IsChecked=resetReminders.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,12)};stack.Children.Add(enabled);
         stack.Children.Add(Text("Remind me before reset",11,Muted));
-        var lead=new ComboBox{ItemsSource=ResetReminders.LeadOptions,SelectedItem=resetReminders.LeadMinutes,ItemStringFormat="{0} minutes",Padding=new Thickness(7),Margin=new Thickness(0,6,0,14),Foreground=Brush("#172438"),Background=Brush("#EDF4FC")};stack.Children.Add(lead);
+        var lead=new ComboBox{ItemsSource=ResetReminders.LeadOptions,SelectedItem=resetReminders.LeadMinutes,ItemStringFormat="{0} minutes",Margin=new Thickness(0,6,0,14),Foreground=new SolidColorBrush(Ink)};stack.Children.Add(lead);
         stack.Children.Add(Text("Only current readings with a known reset time qualify. Prism must be running, either visible or in the system tray.",11,Muted));
         var status=Text("",11,Muted);status.Margin=new Thickness(0,10,0,10);stack.Children.Add(status);
         stack.Children.Add(Button("Preview reminder","Show a sample reminder without changing alert history",()=>ShowReminder(new[]{"Codex · 5-hour: resets in 20m · 42% left"},true)));
@@ -483,7 +518,7 @@ public sealed partial class Widget : Window
             var next=new ResetReminders{Enabled=enabled.IsChecked==true,LeadMinutes=lead.SelectedItem is int minutes?minutes:30,Notified=resetReminders.Notified};
             try{next.Save(System.IO.Path.Combine(Data,"reset-reminders.json"));resetReminders=next;DismissReminder();dialog.Close();CheckResetReminders();}
             catch(Exception e) when(e is IOException or UnauthorizedAccessException){status.Text="Could not save reminders. Check folder access.";}
-        });save.Margin=new Thickness(4,8,0,0);stack.Children.Add(save);dialog.ShowDialog();
+        });save.Margin=new Thickness(0,8,0,0);stack.Children.Add(Primary(save));dialog.ShowDialog();
     }
     void UpdateClocks()
     {
@@ -504,7 +539,7 @@ public sealed partial class Widget : Window
     }
     void ShowClocks()
     {
-        var dialog=new Window{Title="Prism · World clocks",Width=490,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · World clocks",Width=490,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Two places. One glance.",23));
         var info=Text("Add two clocks alongside your local time. Daylight saving is handled by Windows. Hover a clock for its date and UTC offset.",12,Muted);info.Margin=new Thickness(0,10,0,16);stack.Children.Add(info);
@@ -512,7 +547,7 @@ public sealed partial class Widget : Window
         var zones=TimeZoneInfo.GetSystemTimeZones();
         (ComboBox zone,TextBox label) Choice(string title,string id,string name){
             var label=Input(stack,title+" label",name);label.MaxLength=24;
-            var combo=new ComboBox{ItemsSource=zones,DisplayMemberPath="DisplayName",SelectedValuePath="Id",SelectedValue=id,IsTextSearchEnabled=true,MaxDropDownHeight=260,Margin=new Thickness(0,8,0,4),Padding=new Thickness(6),Foreground=Brush("#172438"),Background=Brush("#EDF4FC")};
+            var combo=new ComboBox{ItemsSource=zones,DisplayMemberPath="DisplayName",SelectedValuePath="Id",SelectedValue=id,IsTextSearchEnabled=true,MaxDropDownHeight=260,Margin=new Thickness(0,8,0,4),Foreground=new SolidColorBrush(Ink)};
             combo.SelectionChanged+=(_,_)=>{if(combo.SelectedItem is TimeZoneInfo zone)label.Text=WorldClocks.Label(null,zone.Id);};
             stack.Children.Add(combo);return(combo,label);
         }
@@ -524,7 +559,7 @@ public sealed partial class Widget : Window
             var next=new ClockPreferences(enabled.IsChecked==true,a.Id,b.Id,WorldClocks.Label(first.label.Text,a.Id),WorldClocks.Label(second.label.Text,b.Id));
             try{next.Save(System.IO.Path.Combine(Data,"clocks.json"));clockPreferences=next;AdaptLayout();dialog.Close();}
             catch(Exception e) when(e is IOException or UnauthorizedAccessException){note.Text="Could not save the clock preferences. Check folder access.";}
-        });stack.Children.Add(save);dialog.ShowDialog();
+        });stack.Children.Add(Primary(save));dialog.ShowDialog();
     }
     async System.Threading.Tasks.Task ShowDiagnostics()
     {
@@ -540,17 +575,17 @@ public sealed partial class Widget : Window
             report+=await stdout;await stderr;
         }catch{report+="Python diagnostics unavailable. Run Setup.cmd and try again.";}
         if(closed)return;
-        var dialog=new Window{Title="Prism · Diagnostics",Owner=this,Width=490,Height=500,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Diagnostics",Owner=this,Width=490,Height=500,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Connection diagnostics",23));
         var info=Text("Dependency availability only. This report contains no account IDs, quota values, credentials, folder paths or machine name. CLI detection here checks PATH; provider adapters also check supported installation locations.",12,Muted);info.Margin=new Thickness(0,12,0,12);stack.Children.Add(info);
-        var content=new TextBox{Text=report,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Background=Brush("#1C2D43"),Foreground=new SolidColorBrush(Ink),Padding=new Thickness(12),BorderThickness=new Thickness(0)};stack.Children.Add(content);
+        var content=new TextBox{Text=report,IsReadOnly=true,TextWrapping=TextWrapping.Wrap,Padding=new Thickness(12),FontFamily=new FontFamily("Cascadia Mono, Consolas"),FontSize=12};stack.Children.Add(content);
         var copy=Button("Copy report","Copy dependency diagnostics to clipboard",()=>{try{Clipboard.SetText(report);}catch{MessageBox.Show("Clipboard is busy. Select the report and copy it manually.","Prism");}});copy.Margin=new Thickness(0,12,0,0);stack.Children.Add(copy);dialog.ShowDialog();
     }
     void ShowConnection(string key,string name)
     {
         if(key=="openrouter"){ShowOpenRouter();return;}
-        var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
         var clockSetup=Button("World clocks…","Show or configure two additional timezone clocks",()=>{dialog.Close();ShowClocks();});clockSetup.Margin=new Thickness(0,12,0,0);stack.Children.Add(clockSetup);
@@ -567,13 +602,13 @@ public sealed partial class Widget : Window
         bool enabled=false;try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"connections.json")));enabled=doc.RootElement.GetProperty("allowStoredCredentials").GetBoolean();}catch{}
         var consent=new CheckBox{Content="Allow my existing Cursor / OpenCode sign-ins",IsChecked=enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,14,0,12)};stack.Children.Add(consent);
         var consentStatus=Text("",11,Muted);stack.Children.Add(consentStatus);
-        stack.Children.Add(Button("Save connection preference","Enable or disable automatic authenticated quota reads",async()=>{
+        stack.Children.Add(Primary(Button("Save connection preference","Enable or disable automatic authenticated quota reads",async()=>{
             try{
                 var connections=LocalJson.Load<Dictionary<string,bool>>(System.IO.Path.Combine(Data,"connections.json"))??new();connections["allowStoredCredentials"]=consent.IsChecked==true;LocalJson.Save(System.IO.Path.Combine(Data,"connections.json"),connections);
                 foreach(string id in new[]{"cursor","opencode"}){CancelProvider(id);providerData.Remove(id);latestReadings.Remove(ProviderName(id));cards[id].MarkOffline();}
                 schedule.Reset();RefreshDisplayedProviders();ReconcileMetricVisibility();dialog.Close();await UpdateProviders(true);
             }catch(IOException){consentStatus.Text=L.T("Could not save settings. Check folder access.");}catch(UnauthorizedAccessException){consentStatus.Text=L.T("Could not save settings. Check folder access.");}
-        }));
+        })));
         var claudeTitle=Text("CLAUDE SUBSCRIPTION",11,Muted);claudeTitle.Margin=new Thickness(0,28,0,9);stack.Children.Add(claudeTitle);
         stack.Children.Add(Text("Prism reads Claude Code’s /usage panel every 5 minutes. Sign in with your Claude subscription and finish any first-run CLI setup. No browser extension or manual numbers are needed; Claude Code manages its own credentials.",12));
         var guide=Button("Sign in to Claude","Open Claude Code's own subscription sign-in",()=>OpenUrl(System.IO.Path.Combine(Root,"Connect Claude CLI.cmd")));guide.Margin=new Thickness(0,14,0,10);stack.Children.Add(guide);
@@ -581,12 +616,12 @@ public sealed partial class Widget : Window
         var status=Text("Codex is already automatic. Cursor and Go check their servers every 5 minutes; errors back off without losing the capture timestamp.",11,Muted);status.Margin=new Thickness(0,24,0,0);stack.Children.Add(status);
         dialog.ShowDialog();
     }
-    static TextBox Input(StackPanel panel,string label,string value){var t=Text(label,11,Muted);t.Margin=new Thickness(0,12,0,5);panel.Children.Add(t);var input=new TextBox{Text=value,Padding=new Thickness(8),Background=Brush("#1D2C43"),Foreground=new SolidColorBrush(Ink),BorderBrush=Brush("#3E526D")};panel.Children.Add(input);return input;}
+    static TextBox Input(StackPanel panel,string label,string value){var t=Text(label,11,Muted);t.Margin=new Thickness(0,12,0,5);panel.Children.Add(t);var input=new TextBox{Text=value};panel.Children.Add(input);return input;}
     static void OpenUrl(string url){try{Process.Start(new ProcessStartInfo(url){UseShellExecute=true});}catch{MessageBox.Show("This connection could not be opened. Check that the Prism folder is complete.","Prism");}}
     sealed record MemoryApp(int Id,long Started,string Name,long Bytes);
     static List<MemoryApp> MemoryApps()
     {
-        var result=new List<MemoryApp>();int session=Process.GetCurrentProcess().SessionId;
+        var result=new List<MemoryApp>();int session;using(var current=Process.GetCurrentProcess())session=current.SessionId;
         foreach(var p in Process.GetProcesses())using(p)try{
             if(p.SessionId!=session||new[]{"dwm","csrss","winlogon","sihost","fontdrvhost","explorer"}.Contains(p.ProcessName.ToLowerInvariant()))continue;
             if(p.WorkingSet64<1024*1024)continue;
@@ -598,14 +633,15 @@ public sealed partial class Widget : Window
     {
         try{
             using var p=Process.GetProcessById(app.Id);
-            if(p.StartTime.ToUniversalTime().Ticks!=app.Started||p.SessionId!=Process.GetCurrentProcess().SessionId)return(false,0,0);
+            using var current=Process.GetCurrentProcess();
+            if(p.StartTime.ToUniversalTime().Ticks!=app.Started||p.SessionId!=current.SessionId)return(false,0,0);
             IntPtr handle=Native.OpenProcess(0x1100,false,app.Id);if(handle==IntPtr.Zero)return(false,0,0);
             try{p.Refresh();long before=p.WorkingSet64;bool ok=Native.EmptyWorkingSet(handle);p.Refresh();return(ok,before,p.WorkingSet64);}finally{Native.CloseHandle(handle);}
         }catch{return(false,0,0);}
     }
     void ShowMemory()
     {
-        var dialog=new Window{Title="Prism · Free RAM",Width=490,Height=580,MinWidth=420,MinHeight=420,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Brush("#121E30"),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Free RAM",Width=490,Height=580,MinWidth=420,MinHeight=420,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
         var root=new Grid{Margin=new Thickness(24)};foreach(var height in new[]{GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto,GridLength.Auto})root.RowDefinitions.Add(new(){Height=height});dialog.Content=root;
         var title=Text("A little breathing room",23);root.Children.Add(title);
         var desc=Text("Release eligible RAM pages from Prism or apps you select. Apps stay open and files are untouched. Memory can return immediately; the next interaction may be slower. This does not delete files or AI conversation memory.",12,Muted);desc.Margin=new Thickness(0,12,0,16);Grid.SetRow(desc,1);root.Children.Add(desc);
@@ -615,7 +651,7 @@ public sealed partial class Widget : Window
         }
         var scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(scroll,2);root.Children.Add(scroll);
         var result=Text("Only Prism is selected by default. Protected apps may be skipped.",11,Muted);result.Margin=new Thickness(0,14,0,14);Grid.SetRow(result,3);root.Children.Add(result);
-        var action=Button("Free selected RAM","Trim eligible working-set pages from selected processes",()=>{});
+        var action=Primary(Button("Free selected RAM","Trim eligible working-set pages from selected processes",()=>{}));action.Padding=new Thickness(14,8,14,8);
         action.Click+=async (_,_)=>{
             var selected=choices.Where(x=>x.check.IsChecked==true).Select(x=>x.app).ToList();if(selected.Count==0){result.Text="Select at least one app.";return;}
             action.IsEnabled=false;result.Text="Releasing eligible pages…";
@@ -778,7 +814,7 @@ public sealed partial class Widget : Window
             value.HorizontalAlignment=HorizontalAlignment.Right;value.Foreground=Brush(color);Add(row,value,2);stack.Children.Add(row);readout.Visibility=Visibility.Collapsed;stack.Children.Add(readout);
             bar=Bar(color);stack.Children.Add(bar);detail.Margin=new Thickness(0,6,0,0);stack.Children.Add(detail);
             Element=Panel(stack,"#75263853",14);Element.Padding=new Thickness(13,11,13,11);Element.Margin=new Thickness(0,0,8,8);Element.Cursor=Cursors.Hand;Element.ToolTip="Click to manage "+name+" connection";
-            Element.MouseLeftButtonUp+=(_,_)=>click();Element.MouseEnter+=(_,_)=>Element.BorderBrush=Brush(color);Element.MouseLeave+=(_,_)=>Element.BorderBrush=Brush("#304C6078");
+            Element.MouseLeftButtonUp+=(_,_)=>click();var edge=Element.BorderBrush;Element.MouseEnter+=(_,_)=>Element.BorderBrush=accent;Element.MouseLeave+=(_,_)=>Element.BorderBrush=edge;
             Element.Focusable=true;Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)click();};System.Windows.Automation.AutomationProperties.SetName(Element,name+" connection");
         }
         public void SetDensity(int level,double width)
