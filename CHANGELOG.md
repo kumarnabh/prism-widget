@@ -1,5 +1,12 @@
 # Change log
 
+## 2.1.4 — OpenCode Console connection
+
+- Read Go allowance through OpenCode v2's Console usage API using the existing Console sign-in. The old Go API-key path remains available when v2 is absent.
+- Add an optional checksum-verified private v2.2.2 runtime installer without changing the global OpenCode CLI.
+- Keep credentials in memory during export and stdin transfer into a temporary private CLI database, removed after the check. No model prompt is sent. Only normalized quota and opaque account scopes enter caches/history.
+- Validate quota/reset fields, recheck the source sign-in after collection, isolate account caches, and bound output/timeouts with child-process cleanup.
+
 ## 2.1.3 — Clear message when terminal libraries are missing
 
 - If Setup has not installed the Python terminal libraries, Claude now says so ("Run Setup.cmd in the Prism folder") instead of the generic "terminal could not be read".

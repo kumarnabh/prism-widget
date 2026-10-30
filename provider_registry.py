@@ -34,6 +34,7 @@ class ProviderAdapter:
         key = self.metadata['adapter']
         if key == 'codex': return providers.codex()
         if key == 'claude': return providers.claude()
+        if key == 'opencode': return providers.opencode()
         return providers.auto_sources.collect_account(key)
 
     def normalize(self, raw, now=None): return normalize(self.metadata, raw, now)
@@ -46,5 +47,7 @@ class ProviderAdapter:
         # Clear only this adapter's normalized quota cache. Provider credentials remain provider-owned.
         if self.metadata['id'] in {'cursor', 'opencode', 'openrouter'}:
             (ROOT / 'data' / (self.metadata['id'] + '-automatic.json')).unlink(missing_ok=True)
+        if self.metadata['id'] == 'opencode':
+            (ROOT / 'data' / 'opencode-cli.json').unlink(missing_ok=True)
 
 def adapters(): return {row['id']: ProviderAdapter(row) for row in manifest()}

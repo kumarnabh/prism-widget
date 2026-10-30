@@ -58,7 +58,7 @@ The release includes .NET; no SDK or administrator access is needed. Executables
 | --- | --- | --- |
 | Codex | Install and sign in to Codex CLI | Active-account quota through its local app server; historical telemetry is only a stale fallback after connection failure. |
 | Cursor Individual | Sign in to Cursor; enable reuse in Prism | Read-only usage endpoint using the existing local sign-in. Team plans are unsupported. |
-| OpenCode Go | Configure Go in OpenCode; enable reuse | Read-only Go usage endpoint. A Zen/API key without Go entitlement is insufficient. |
+| OpenCode Go | Sign in to Console through OpenCode v2; enable reuse | Read-only Console CLI quota; legacy Go API keys remain supported. See setup below. |
 | OpenRouter | Enable separately in Connections; reuse an existing environment key after opt-in | Documented key credit limit/remaining; no raw key labels or guessed reset. |
 | Claude subscription | Install Claude Code; choose **Sign in to Claude** and complete first-run setup | Built-in interactive `/usage` panel every five minutes, with hooks/MCP disabled and no model prompt. |
 
@@ -67,6 +67,10 @@ Cursor and Go credential reuse is opt-in. Prism never asks for pasted tokens, ne
 Optional Claude browser sync and status-line feed setup is in the included [connection guide](README.html). Multiple browser accounts require an explicit choice. API-key Claude sessions do not provide subscription quota.
 
 OpenRouter is disabled by default. In Connections, enable it and separately allow reuse of your existing `OPENROUTER_API_KEY` environment value. Restart Prism after changing the environment. It reads only the documented key-usage endpoint: key credit allowance is not an account balance or token count. Unlimited keys and exact reset timestamps remain unknown. [Provider contract and contribution guide](docs/PROVIDERS.md).
+
+### OpenCode Console setup
+
+From the Prism folder, run `powershell -NoProfile -File .\scripts\install-opencode.ps1` to install a checksum-verified private OpenCode v2.2.2 runtime. This leaves your global CLI unchanged. Existing native v2 installations are also detected. Enable existing-sign-in reuse in Connections and refresh. If Console is not signed in, run `.\data\tools\opencode-v2\2.2.2\opencode.exe auth login opencode` first. Prism reads the three Go quota windows through OpenCode's own usage API without a model prompt. Credentials pass through stdin into a temporary private CLI database, removed after the check; caches contain only normalized quota and opaque account scopes. Free-model limits and Console spending budgets are not reported as Go quota. The legacy Go-key endpoint is retained when v2 is unavailable.
 
 ## Readings and controls
 

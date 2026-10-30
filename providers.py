@@ -1,5 +1,5 @@
 """Read-only quota collectors. Credential reuse requires an explicit saved opt-in."""
-import concurrent.futures, datetime, json, math, os, pathlib, queue, shutil, sqlite3, subprocess, sys, threading, time
+import concurrent.futures, datetime, json, math, os, pathlib, queue, shutil, subprocess, sys, threading, time
 import auto_sources
 import claude_cli
 from history_scope import codex_scope
@@ -138,23 +138,9 @@ def claude_statusline():
     return {'status':'Feed' if time.time()-at<600 else 'Stale','source':'Claude Code status line','at':at,'windows':windows}
 
 def opencode():
-    path=pathlib.Path(os.environ.get('XDG_DATA_HOME',str(HOME/'.local/share')))/'opencode/opencode.db'
-    if not path.exists(): return {'status':'Connect','detail':'Open the Go console to check your allowance.'}
-    # Only aggregate assistant usage. Never read message text, keys, or auth files.
-    with sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=2) as conn:
-        conn.execute('PRAGMA temp_store=MEMORY')
-        deadline=time.monotonic()+3
-        conn.set_progress_handler(lambda: int(time.monotonic()>deadline),10000)
-        row=conn.execute('''SELECT COUNT(*),
-          COALESCE(SUM(COALESCE(json_extract(data,'$.tokens.input'),0) + COALESCE(json_extract(data,'$.tokens.output'),0)
-            + COALESCE(json_extract(data,'$.tokens.reasoning'),0) + COALESCE(json_extract(data,'$.tokens.cache.read'),0)
-            + COALESCE(json_extract(data,'$.tokens.cache.write'),0)),0),
-          COALESCE(SUM(json_extract(data,'$.cost')),0)
-          FROM message WHERE time_created >= ? AND json_extract(data,'$.role')='assistant'
-          AND json_extract(data,'$.providerID')='opencode-go' ''',
-          (int((time.time()-7*86400)*1000),)).fetchone()
-    return {'status':'Local usage','source':'OpenCode local database','at':time.time(),
-            'tokensUsed':row[1],'cost':row[2], 'detail':'Go tokens used over 7 days, including cache. Check the Go console for remaining quota.'}
+    import opencode_cli
+    return opencode_cli.collect()
+
 
 def manual(name):
     path=DATA/f'{name}-manual.json'

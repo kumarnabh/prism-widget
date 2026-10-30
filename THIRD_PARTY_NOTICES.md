@@ -9,6 +9,7 @@ Prism is MIT-licensed. Product names remain their owners' trademarks; no endorse
 | pywinpty 3.0.5 | Windows pseudo-terminal, installed by Setup | [MIT](https://github.com/andfoy/pywinpty/blob/main/LICENSE.txt) |
 | pyte 0.8.2 | Terminal parser, installed by Setup | [LGPL-3.0-or-later](https://github.com/selectel/pyte/blob/master/LICENSE) |
 | wcwidth 0.9.1 | Unicode widths, installed by Setup | [MIT](https://github.com/jquast/wcwidth/blob/master/LICENSE) |
+| OpenCode v2.2.2 | Optional independent runtime download; not bundled | [Upstream source and license](https://github.com/anomalyco/opencode/tree/v2.2.2) |
 
 Python dependencies are downloaded independently into the user's virtual environment, with their wheel license metadata; they are not bundled in the release ZIP. Included .NET notices come from official runtime/WPF v8.0.28 tags, matching the 1.7.0 release runtime. Check them when changing the runtime selected by the installed SDK; record actual runtime versions for releases.
 

@@ -13,10 +13,12 @@ dotnet publish (Join-Path $prismRoot 'source\Prism.csproj') -c Release -r win-x6
 if($LASTEXITCODE -ne 0){throw 'Publish failed'}
 # Explicit source allowlist: never copy the installation folder wholesale.
 $files=@('Setup.ps1','Setup.cmd','Launch Prism.cmd','Connect Claude CLI.cmd','Install Claude Browser Sync.cmd',
-    'prism-native-host.cmd','install-browser-sync.ps1','providers.py','auto_sources.py','claude_cli.py',
+    'prism-native-host.cmd','install-browser-sync.ps1','providers.py','auto_sources.py','claude_cli.py','opencode_cli.py',
     'claude_feed.py','native_host.py','quota_cache.py','provider_contract.py','provider_registry.py','provider-manifest.json','history_scope.py','doctor.py','requirements.txt',
     'README.md','README.html','LICENSE','PRIVACY.md','SECURITY.md','CONTRIBUTING.md','AUDIT.md','TROUBLESHOOTING.md','CHANGELOG.md','THIRD_PARTY_NOTICES.md')
 foreach($name in $files){Copy-Item -LiteralPath (Join-Path $prismRoot $name) -Destination $stage}
+New-Item -ItemType Directory -Path (Join-Path $stage 'scripts') -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $prismRoot 'scripts\install-opencode.ps1') -Destination (Join-Path $stage 'scripts')
 foreach($folder in @('browser-extension','assets','docs\legal')){
     $destination=Join-Path $stage $folder
     New-Item -ItemType Directory -Path $destination -Force | Out-Null

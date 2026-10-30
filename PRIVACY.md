@@ -7,7 +7,8 @@ Prism runs locally. There is no Prism server, analytics, crash upload or automat
 | System metrics | Windows CPU, memory, GPU/VRAM, battery, frequency, drive and network counters | Widget memory and cached taskbar preview; local self-tests include sensor values |
 | Optional resource consumers | Process names, PID/start time, current CPU and RAM | Secondary view only, in memory; no command lines, persistence or upload |
 | Codex | Current CLI quota; local credential-file bytes only for an opaque history scope; historical quota events as stale fallback | Provider through its own CLI; no credential bytes persisted or sent by history code |
-| Cursor / Go | Existing local sign-in after opt-in | Credential to its own fixed HTTPS usage endpoint; quota cache and credential fingerprint locally |
+| Cursor / legacy Go | Existing local sign-in after opt-in | Credential to its own fixed HTTPS usage endpoint; quota cache and credential fingerprint locally |
+| OpenCode Console | Existing Console integration after opt-in, exported in memory through the v2 CLI | Credentials transferred via stdin into a temporary private CLI database; provider-owned quota request; normalized quota and opaque fingerprint cached locally |
 | Claude CLI | Authentication status and built-in usage panel | Claude manages its connection; normalized quota/account fingerprint cached locally |
 | Optional browser bridge | Claude organization list and quota | Organization choice in extension storage; only quota values to local native host |
 | Optional status-line feed | Recognized numeric quota fields | Local quota cache; unknown fields/conversation contents discarded |
@@ -16,9 +17,9 @@ Prism runs locally. There is no Prism server, analytics, crash upload or automat
 | Startup | Explicit opt-in per Windows user | Quoted local executable path under HKCU Run; no service or scheduled task |
 | Diagnostics | Runtime versions, architecture, OS family, dependency/CLI availability | Screen; clipboard only when you choose Copy |
 
-`data/` contains consent, caches, fingerprints, clocks, reminder history, window/metric/language preferences, layout profiles, numeric usage history, downloaded updates and a dedicated Claude CLI workspace. Treat it as private even though Prism does not deliberately persist raw credentials. Claude may create files according to its own behavior. Self-tests create local screenshots and sensor reports; live-account tests may include quota in screenshots. Prism error logs contain exception class names rather than raw responses.
+`data/` contains consent, caches, fingerprints, clocks, reminder history, window/metric/language preferences, layout profiles, numeric usage history, downloaded updates and a dedicated Claude CLI workspace. Treat it as private. OpenCode Console checks temporarily import credentials into a private database under `data/` and remove that workspace on normal completion; abrupt termination may leave private temporary files. No credentials enter the quota cache or history. Claude may create files according to its own behavior. Self-tests create local screenshots and sensor reports; live-account tests may include quota in screenshots. Prism error logs contain exception class names rather than raw responses.
 
-Prism submits no model prompts. Provider apps/CLIs retain responsibility for their own authentication/network policies. Cursor and Go reject redirects; the browser bridge is restricted to claude.ai. Setup contacts the configured Python package index; source builds contact NuGet.
+Prism submits no model prompts. Provider apps/CLIs retain responsibility for their own authentication/network policies. Cursor and Go reject redirects; the browser bridge is restricted to claude.ai. Setup contacts the configured Python package index; source builds contact NuGet. The optional OpenCode runtime installer downloads a pinned official GitHub release and verifies its SHA-256 before extraction; the runtime is not bundled in Prism releases.
 
 ## Control and removal
 

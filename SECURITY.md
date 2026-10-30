@@ -8,7 +8,7 @@ Use [GitHub private vulnerability reporting](https://github.com/kumarnabh/prism-
 
 ## Boundaries
 
-Prism runs with your Windows privileges. Cursor/Go credential access is opt-in and read-only, with fixed usage endpoints and refused redirects. Native browser messages validate origin, size and numeric fields. Registration is current-user only. Do not share a writable installation with untrusted users: modifying its scripts permits code execution as you.
+Prism runs with your Windows privileges. Cursor/legacy Go credential access is opt-in and read-only, with fixed usage endpoints and refused redirects. Opted-in OpenCode Console reads use its native v2 CLI: only the Console integration is exported in memory and passed through stdin into a private temporary database. Normal completion removes that database; abrupt termination can leave private files under data/. No Console identity or raw credentials enter quota caches. No model prompt is submitted. Native browser messages validate origin, size and numeric fields. Registration is current-user only. Do not share a writable installation with untrusted users: modifying its scripts permits code execution as you.
 
 Contributors must preserve account scoping, freshness, payload sanitization, deadlines and no-model-prompt behavior. Tests must use fake data and mocked accounts. Before publication, check staged files, full Git history and release contents. Scanners reduce risk; they cannot prove absence of every secret or bug.
 

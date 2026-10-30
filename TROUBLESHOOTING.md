@@ -17,7 +17,9 @@ Use **⋯ → Diagnostics** first. For issues, include Prism/Windows versions, d
 | Quota is a dash | No valid window returned. Check sign-in, tooltip and Connections. Unknown means neither zero nor full. |
 | Codex stale | Active-account verification failed; historical data is unverified and cannot trigger alerts. Check CLI sign-in. |
 | Cursor unavailable | Use an individual plan, sign in again, enable reuse and refresh. Prism does not renew credentials. |
-| Go 403/unavailable | Confirm Go subscription entitlement. A generic Zen key is insufficient. |
+| Go 403/unavailable with a working Console sign-in | Install the private OpenCode v2 runtime with `powershell -NoProfile -File .\scripts\install-opencode.ps1` from the Prism folder; enable existing-sign-in reuse and refresh. Your global v1 CLI is preserved. |
+| OpenCode Console needs sign-in | Use `.\data\tools\opencode-v2\2.2.2\opencode.exe auth login opencode`, then refresh. Do not paste credentials into Prism. |
+| Console connected, Go quota unknown | Go allowance requires entitlement. Free-model limits and Console spending budgets are not Go quota; Prism leaves them unknown. |
 | Claude needs setup | Finish first-run setup and subscription login through Connect Claude CLI.cmd. API-key auth is not a subscription. |
 | Claude numbers, no reminder | CLI lacks reset timestamps. Browser/feed readings can qualify if they provide a current reset. |
 | Browser account selection stuck | Select a current account explicitly in the popup, including after a saved account was removed. |

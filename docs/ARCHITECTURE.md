@@ -6,7 +6,7 @@
 
 `providers.py` runs adapters concurrently and normalizes source, status, capture time and quota windows. `quota_cache.py` validates caches; `QuotaSnapshot.cs` independently validates the UI boundary. Missing/malformed/expired values cannot become full balances. The limiting valid window determines displayed capacity.
 
-`auto_sources.py` handles opt-in Cursor/Go access, fixed endpoints, account-scoped caches and backoff. `claude_cli.py` reads the built-in usage panel with hooks/MCP disabled. The optional browser bridge sends sanitized fields through `native_host.py`; the status-line feed accepts only known numeric quota. No model prompts are submitted.
+`auto_sources.py` handles opt-in Cursor/legacy Go access, fixed endpoints, account-scoped caches and backoff. `opencode_cli.py` reads Console Go allowance through a private v2 CLI database with stdin credential transfer, bounded output, account verification and cleanup. `claude_cli.py` reads the built-in usage panel with hooks/MCP disabled. The optional browser bridge sends sanitized fields through `native_host.py`; the status-line feed accepts only known numeric quota. No model prompts are submitted.
 
 `WorldClocks.cs` uses Windows timezone conversion. `ResetReminders.cs` checks >10%, freshness and known reset boundaries, with persistent bounded deduplication. WPF shows a short popup. Settings may scroll; the dashboard does not.
 
