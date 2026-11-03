@@ -12,7 +12,7 @@ from unittest.mock import patch
 import github_provider as gh
 from github_metrics import CATALOG, validate
 from provider_contract import normalize
-from provider_registry import manifest
+from provider_registry import adapters, manifest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TMP = ROOT / 'build' / 'test-tmp'
@@ -107,6 +107,16 @@ class BoundaryTests(unittest.TestCase):
                 gh.save(gh.DATA/'github-connection.json',{**config,'Repositories':[repository]})
                 with self.assertRaises(gh.Failure):gh.configuration()
 
+    def test_private_repository_labels_are_bounded_and_never_diagnostic_fields(self):
+        raw=reading();raw['repositories']=[{'scope':'b'*64,'usd':1,'name':'private/repository'}]
+        self.assertEqual(validate(raw)['repositories'][0]['name'],'private/repository')
+        self.assertEqual(set(adapters()['github'].diagnostics()),{'provider_id','availability','authentication','source'})
+        for name in ('a/..','a/.','a/repo\nsecret','a/'+'x'*101,'https://evil.test/repo',True,None):
+            raw['repositories'][0]['name']=name
+            with self.subTest(name=name),self.assertRaises(ValueError):validate(raw)
+        raw['repositories'][0]['name']='private/ghp_'+'a'*30
+        self.assertEqual(validate(raw)['repositories'][0]['name'],'')
+
     def test_repository_counts_snapshots_and_partial_permission(self):
         client=gh.Client(TOKEN)
         runs=[{'id':i+1,'created_at':PERIOD+'-01T00:00:00Z','conclusion':c} for i,c in enumerate(('success','failure','cancelled','timed_out',None))]
@@ -180,13 +190,14 @@ class CollectionTests(unittest.TestCase):
     def test_no_consent_no_token_no_network(self):
         with patch.object(gh,'configuration',return_value=None),patch.object(gh.Client,'get') as network:
             self.assertEqual(gh.collect()['status'],'Connect');self.token.assert_not_called();network.assert_not_called()
-    def test_personal_organization_scopes_and_private_repository_redaction(self):
+    def test_personal_organization_scopes_and_diagnostic_redaction(self):
         scopes=[]
         for organization in ('','fixture-org'):
             with patch.object(gh,'configuration',return_value=('cli',organization,[])),patch.object(gh.Client,'get',return_value=({'usageItems':[item(repositoryName='private/repository')]},{})) as get:
                 result=gh.collect();scopes.append(result['scope']);self.assertEqual(result['status'],'Live')
                 self.assertIn('/organizations/fixture-org/' if organization else '/users/fixture-user/',get.call_args.args[0])
-                self.assertNotIn('private/repository',json.dumps(result));self.assertNotIn(TOKEN,(self.directory/'github-cache.json').read_text())
+                self.assertEqual(result['repositories'][0]['name'],'private/repository')
+                self.assertNotIn('private/repository',json.dumps(adapters()['github'].diagnostics()));self.assertNotIn(TOKEN,(self.directory/'github-cache.json').read_text())
                 self.assertEqual(result['repositories'][0]['usd'],.8)
         self.assertNotEqual(*scopes)
     def test_partial_billing_permission_still_collects_repository_stats(self):

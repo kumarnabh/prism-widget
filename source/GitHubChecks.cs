@@ -8,13 +8,14 @@ public static class GitHubChecks
     public static JsonElement Fixture(DateTimeOffset now,double spend=8)
     {
         var metrics=GitHubCatalog.All.Select(m=>new{id=m.Id,unit=m.Unit,value=m.Category is "allowance" or "forecast"?(double?)null:m.Id=="github-spend"?spend:m.Unit=="bytes"?256*1048576d:12d,state=m.Category is "allowance" or "forecast"?"Unknown":"Live",source=m.Id is "github-runs" or "github-successes" or "github-failures" or "github-artifacts" or "github-cache"?"repository":"billing"});
-        using var doc=JsonDocument.Parse(JsonSerializer.Serialize(new{schema_version=1,provider_id="github",status="Live",at=now.ToUnixTimeSeconds(),scope=new string('a',64),period=now.UtcDateTime.ToString("yyyy-MM"),metrics,repositories=new[]{new{scope=new string('b',64),usd=spend}}}));return doc.RootElement.Clone();
+        using var doc=JsonDocument.Parse(JsonSerializer.Serialize(new{schema_version=1,provider_id="github",status="Live",at=now.ToUnixTimeSeconds(),scope=new string('a',64),period=now.UtcDateTime.ToString("yyyy-MM"),metrics,repositories=new[]{new{scope=new string('b',64),usd=spend,name="example/project"}}}));return doc.RootElement.Clone();
     }
     public static bool Verify(string root)
     {
         void Require(bool value,string label){if(!value)throw new InvalidOperationException("GitHub check failed: "+label);}
         var now=new DateTimeOffset(2026,11,4,12,0,0,TimeSpan.Zero);var reading=GitHubReading.Read(Fixture(now,0),now);
         Require(reading.Fresh(now)&&reading.Metric("github-spend").Value==0&&reading.Metric("github-actions-allowance").Value is null,"typed zero and unknown allowance");
+        Require(reading.Repositories.Single().Name=="example/project","validated private repository drill-down labels");
         Require(GitHubReading.Read(Fixture(now),now.AddSeconds(3601)).Status=="Stale","freshness independent of schedule");
         Require(!reading.Fresh(now.AddMonths(1)),"billing month does not leak across reset");
         string serialized=Fixture(now).GetRawText();

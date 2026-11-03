@@ -14,7 +14,7 @@
   {"id":"github-lfs-storage","name":"Git LFS storage","unit":"GB-hours","category":"storage","description":"Reported metered LFS storage when the billing report uses GB-hours."},
   {"id":"github-lfs-bandwidth","name":"Git LFS bandwidth","unit":"GB","category":"transfer","description":"Reported LFS bandwidth when available."},
   {"id":"github-spend","name":"Month billable spend","unit":"USD","category":"currency","description":"Net metered charges in the current UTC calendar-month report; excludes subscriptions, taxes and invoice adjustments."},
-  {"id":"github-repository-spend","name":"Repository billable spend","unit":"USD","category":"currency","description":"Net charges attributed to repositories in the billing report; opaque repository breakdown in details."},
+  {"id":"github-repository-spend","name":"Repository billable spend","unit":"USD","category":"currency","description":"Net charges attributed to repositories in the billing report; private repository breakdown in details."},
   {"id":"github-forecast","name":"Estimated month spend","unit":"USD","category":"forecast","description":"Local low-confidence trend estimate requiring six regular fresh observations over at least 30 minutes."},
   {"id":"github-exhaustion","name":"Local target reached in","unit":"hours","category":"forecast","description":"Local low-confidence estimate to an explicit currency target; never a GitHub-enforced limit."}
 ]

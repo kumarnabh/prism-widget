@@ -5,7 +5,7 @@ Objective: ship optional read-only typed GitHub monitoring with independent metr
 ## Local checks
 
 - `dotnet build source/Prism.csproj -c Release --no-restore --nologo -p:UseSharedCompilation=false -o build/github-native` — passed, zero warnings/errors on the final build.
-- `./.venv/Scripts/python.exe -m unittest discover -s tests -p 'test_*.py'` — 103 tests passed. Includes 18 GitHub tests with multiple subcases. The existing process-tree cleanup test requires the normal desktop session; it failed under the restricted process sandbox and passed unchanged outside it.
+- `./.venv/Scripts/python.exe -m unittest discover -s tests -p 'test_*.py'` — 104 tests passed. Includes 19 GitHub tests with multiple subcases. The existing process-tree cleanup test requires the normal desktop session; it failed under the restricted process sandbox and passed unchanged outside it.
 - `node --test tests/popup.test.cjs` — 3 tests passed.
 - `./scripts/verify-native.ps1 -InstallationRoot ./build/github-native -TimeoutSeconds 180` — passed in 79 seconds on the final run. All 836 layout cases passed: 16 reference layouts, 480 resize transitions, 160 language/metric/clock cases, 60 hardware cases, 24 ecosystem cases and 96 GitHub/theme/font cases. HD export was 1770 × 3232. Expanded typed tiles are included in the bounds assertions.
 - Native model checks cover units, zero/unknown values, freshness, UTC month changes, account isolation, cautious forecasts, irregular/gapped/corrected data, hidden-metric alert keys/deduplication, select-none thresholds, profile persistence, explicit consent migration, 30-day retention, 40,000-sample history restart and newer-schema preservation.

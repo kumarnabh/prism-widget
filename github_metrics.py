@@ -9,6 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 CATALOG = json.loads((ROOT / 'github-metrics.json').read_text(encoding='utf-8'))
 DEFINITIONS = {row['id']: row for row in CATALOG}
 STATES = {'Live', 'Stale', 'Unknown', 'Unavailable', 'Error', 'Permission', 'Connect', 'Disabled'}
+REPOSITORY_NAME = r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9_.-]{1,100}'
 
 
 def finite(value):
@@ -74,6 +75,9 @@ def validate(raw, now=None):
     for row in repos:
         if not isinstance(row, dict) or not re.fullmatch('[a-f0-9]{64}', str(row.get('scope', ''))) or not finite(row.get('usd')):
             raise ValueError('Invalid repository summary')
-        clean.append({'scope': row['scope'], 'usd': row['usd']})
+        name = row.get('name', '')
+        if not isinstance(name, str) or name and (not re.fullmatch(REPOSITORY_NAME, name) or name.split('/')[1] in {'.', '..'}): raise ValueError('Invalid repository label')
+        if re.search(r'(?i)(?:gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,})', name): name = ''
+        clean.append({'scope': row['scope'], 'usd': row['usd'], 'name': name})
     result['repositories'] = clean if result['status'] in {'Live', 'Stale'} else []
     return result

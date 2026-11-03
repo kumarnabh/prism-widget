@@ -25,7 +25,7 @@ public static class GitHubCatalog
         "%"=>$"{n:0.#}%",_=>$"{n:0.##} {unit}"};
 }
 public sealed record GitHubValue(string Id,string Unit,double? Value,string State,string Source);
-public sealed record GitHubRepository(string Scope,double Usd);
+public sealed record GitHubRepository(string Scope,double Usd,string Name="");
 public sealed record GitHubReading(string Status,string Scope,string Period,DateTimeOffset? At,string Detail,GitHubValue[] Metrics,GitHubRepository[] Repositories)
 {
     public bool Fresh(DateTimeOffset now)=>Status=="Live"&&Scope.Length==64&&At is DateTimeOffset at&&at<=now&&now-at<=TimeSpan.FromHours(1)&&Period==now.UtcDateTime.ToString("yyyy-MM");
@@ -58,7 +58,9 @@ public sealed record GitHubReading(string Status,string Scope,string Period,Date
                 if(repositoryRows.ValueKind!=JsonValueKind.Array||repositoryRows.GetArrayLength()>1000)return Empty("Unavailable");
                 foreach(var row in repositoryRows.EnumerateArray()){
                     string key=row.GetProperty("scope").GetString()??"";double usd=row.GetProperty("usd").GetDouble();
-                    if(!Regex.IsMatch(key,"^[a-f0-9]{64}$")||!double.IsFinite(usd)||usd<0||usd>1e15)return Empty("Unavailable");repos.Add(new(key,usd));
+                    string name=row.TryGetProperty("name",out var label)?label.GetString()??"":"";
+                    if(!Regex.IsMatch(key,"^[a-f0-9]{64}$")||!double.IsFinite(usd)||usd<0||usd>1e15||name.Length>0&&(!Regex.IsMatch(name,@"^[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}$")||name.EndsWith("/.")||name.EndsWith("/..")))return Empty("Unavailable");
+                    if(Regex.IsMatch(name,@"gh[pousr]_[a-z0-9]{20,}|github_pat_[a-z0-9_]{20,}",RegexOptions.IgnoreCase))name="";repos.Add(new(key,usd,name));
                 }
             }
             return new(status,scope,period,at,detail,metrics.ToArray(),repos.ToArray());

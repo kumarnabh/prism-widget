@@ -15,13 +15,13 @@ import urllib.parse
 import urllib.request
 import uuid
 
-from github_metrics import CATALOG, finite, validate
+from github_metrics import CATALOG, REPOSITORY_NAME, finite, validate
 from history_scope import scope_id
 
 ROOT = pathlib.Path(__file__).resolve().parent
 DATA = ROOT / 'data'
 NAME = r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})'
-REPO = NAME + r'/[A-Za-z0-9_.-]{1,100}'
+REPO = REPOSITORY_NAME
 MAX_BYTES = 4_000_000
 
 
@@ -349,7 +349,7 @@ def collect():
                          'source': 'repository' if key in repo_ids else 'billing'})
         result = validate({'status': 'Live' if values else billing_state, 'scope': scope, 'at': now, 'period': period,
                            'message': 'permission' if 'permission' in failures else 'format' if failures else None, 'metrics': rows,
-                           'repositories': [{'scope': scope_id(DATA, 'github-repo', scope + '/' + repo.lower()), 'usd': value} for repo, value in sorted(repo_values.items())]})
+                           'repositories': [{'scope': scope_id(DATA, 'github-repo', scope + '/' + repo.lower()), 'usd': value, 'name': repo} for repo, value in sorted(repo_values.items())]})
         save(path, {'context': context, 'reading': result, 'retry_at': now + 60})
         return result
     except Failure as error:
