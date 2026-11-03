@@ -27,10 +27,12 @@ All images use synthetic account/quota/billing data and example hardware. The ne
 
 - [ ] Connect a real personal account with the narrow billing permission and compare its current-month report with GitHub billing.
 - [ ] Separately select an accessible organization and compare its report; test an inaccessible organization.
-- [ ] Exercise a real optional fine-grained token through Windows Credential Manager, expiry/revocation and disconnect. Native interop is implemented; CI never needs credentials.
+- [ ] Manually verify connection, expiry, revocation and disconnect with the OS-backed sign-in option. Native interop is implemented; CI never needs credentials.
 - [ ] Switch the active CLI account, refresh, and verify no prior-account values/history appear. Offline switch/in-flight/cache isolation cases already pass.
 - [ ] Compare repository counts and storage against real selected repositories, including free/public usage; verify unknown units and API ceilings stay unavailable.
 - [ ] Check physical monitor changes and mixed-DPI scaling at the user's display settings, including ribbon/tray and every glass theme.
 - [ ] Exercise actual Windows notification delivery/quiet settings and restart persistence of opted-in targets. Scoped deduplication/cooldown logic has offline coverage.
 
 No live GitHub billing credentials were used for qualification and no paid workflows were dispatched. Unsupported allowances remain unknown; forecasts are local low-confidence estimates and local targets are not GitHub-enforced limits. These manual items remain unverified rather than being implied by synthetic renders.
+
+The full-history generic-secret detector flagged prose in an earlier version of the manual checklist. `.gitleaksignore` contains only that historical commit/file/rule/line fingerprint; the sentence was rewritten. All scanner rules and the existing exact public-extension-key exception remain unchanged. No credential was present in the flagged sentence.

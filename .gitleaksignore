@@ -1,0 +1,4 @@
+# Generic detector false positive in an already-pushed public manual checklist:
+# "Credential Manager, expiry/revocation" is prose, not credential material.
+# Scope only this historical commit, file, rule and line. Future edits are scanned.
+5860e9f16e15691ec02e67ba5d80149da60898ff:docs/VERIFICATION-2.3.0.md:generic-api-key:30
