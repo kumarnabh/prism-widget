@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from provider_contract import normalize
 
 ROOT = pathlib.Path(__file__).resolve().parent
-CAPABILITIES = {'remaining', 'reset', 'multiple_windows', 'history', 'multi_account', 'plan', 'api_credits', 'local_cli'}
+CAPABILITIES = {'remaining', 'reset', 'multiple_windows', 'history', 'multi_account', 'plan', 'api_credits', 'local_cli', 'typed_metrics'}
 
 def manifest():
     payload = json.loads((ROOT / 'provider-manifest.json').read_text(encoding='utf-8'))
@@ -14,7 +14,7 @@ def manifest():
     rows = payload['providers']
     ids = set()
     for row in rows:
-        if row['id'] in ids or row['adapter'] not in {'codex', 'cursor', 'opencode', 'claude', 'openrouter'} or row['id'] != row['adapter']:
+        if row['id'] in ids or row['adapter'] not in {'codex', 'cursor', 'opencode', 'claude', 'openrouter', 'github'} or row['id'] != row['adapter']:
             raise ValueError('Unregistered adapter')
         if not set(row['capabilities']) <= CAPABILITIES or not 60 <= row['interval'] <= 3600: raise ValueError('Invalid provider capabilities')
         ids.add(row['id'])
@@ -35,6 +35,9 @@ class ProviderAdapter:
         if key == 'codex': return providers.codex()
         if key == 'claude': return providers.claude()
         if key == 'opencode': return providers.opencode()
+        if key == 'github':
+            import github_provider
+            return github_provider.collect()
         return providers.auto_sources.collect_account(key)
 
     def normalize(self, raw, now=None): return normalize(self.metadata, raw, now)
@@ -44,6 +47,8 @@ class ProviderAdapter:
                 'authentication': self.metadata['authentication'], 'source': self.metadata['source']}
 
     def disconnect(self):
+        if self.metadata['id'] == 'github':
+            (ROOT / 'data' / 'github-cache.json').unlink(missing_ok=True)
         # Clear only this adapter's normalized quota cache. Provider credentials remain provider-owned.
         if self.metadata['id'] in {'cursor', 'opencode', 'openrouter'}:
             (ROOT / 'data' / (self.metadata['id'] + '-automatic.json')).unlink(missing_ok=True)

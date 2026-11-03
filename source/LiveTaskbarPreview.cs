@@ -41,7 +41,7 @@ public sealed class LiveTaskbarPreview:IDisposable
             if(width>=80&&height>=60){
             if(metrics.Length==0)Text(L.T("No metrics selected"),14,45,12,muted,width-28);
             int columns=metrics.Length>6&&width>=240?2:1;int maximum=Math.Max(1,(height-42)/32)*columns;int omitted=Math.Max(0,metrics.Length-maximum);metrics=metrics.Take(maximum).ToArray();
-            Text(omitted>0?"P R I S M  · +"+omitted:"P R I S M",14,10,omitted>0?12:14,Ink,width-28);
+            Text(omitted>0?"Prism · +"+omitted:"Prism",14,10,omitted>0?12:14,Ink,width-28);
             int count=(int)Math.Ceiling(metrics.Length/(double)columns);double cell=(width-28d-12*(columns-1))/columns;double row=count==0?30:Math.Min(44,(height-42d)/count);
             for(int i=0;i<metrics.Length;i++){
                 var metric=metrics[i];double x=14+(i%columns)*(cell+12),y=34+(i/columns)*row;bool current=metric.Percent.HasValue&&double.IsFinite(metric.Percent.Value)&&metric.Percent.Value is >=0 and <=100;

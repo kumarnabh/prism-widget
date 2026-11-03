@@ -1,5 +1,14 @@
 # Change log
 
+## 2.3.0 — GitHub monitoring and selectable glass
+
+- Optional, read-only GitHub.com provider with explicit CLI reuse or an installation-specific Windows Credential Manager token; personal and explicitly selected organization billing remain separate.
+- Independently selectable/orderable typed metrics for Actions compute/minutes/workflows/artifacts/cache, Packages, Codespaces, Git LFS, metered USD spending and repository-attributed billing. Missing permissions/unsupported units/unknown allowances never become zero.
+- Detail-only placement, profile persistence, independent 30-minute scheduling, bounded GET-only transport, account isolation, safe backoff and source/month/freshness labels.
+- Local typed 30-day history, cautious low-confidence spending/target estimates and opt-in per-metric local-target alerts with persistent deduplication.
+- Refined header with an integrated vector prism mark and “Prism” wordmark. Select Aurora, Ocean, Dusk or neutral Clear glass in Settings; themes are remembered in profiles.
+- Offline GitHub fixtures, boundary/permission/account/pagination tests and 48 additional metric/theme layout renders. See docs/GITHUB.md for API availability, reporting delays and manual qualification limits.
+
 ## 2.2.0 — Premium glass interface
 
 - New app-wide dark glass theme: settings tabs are pills, and checkboxes, dropdowns, text fields, sliders, lists, menus, tooltips and scrollbars match the widget instead of stock light Windows controls.

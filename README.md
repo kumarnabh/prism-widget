@@ -20,6 +20,8 @@
 - Optional GPU percentage, dedicated VRAM, Windows-reported CPU frequency, battery and disk throughput. Multi-GPU and local-disk details live in **⋯ → System capacity**.
 - Minimize to a taskbar button with live capacity bars in its hover/Peek preview, or use **⋯ → Taskbar ribbon** for a persistent compact view near the taskbar.
 - Automatic Codex, Cursor Individual, OpenCode Go and Claude subscription quota adapters, plus optional OpenRouter key-credit allowance.
+- Optional read-only GitHub billing, Actions, storage and developer-capacity metrics, each selectable/orderable or shown only in details. [Setup, permissions and metric meanings](docs/GITHUB.md).
+- Integrated Prism header mark and four selectable glass themes, including neutral Clear glass with no accent color.
 - A reviewed provider registry, individual collection/timeout isolation, and a Connections page with source, schedule, last update, enable/disable and setup guidance.
 - Expanded glass gauges and detailed cards stay available with GPU/hardware metrics enabled. Short layouts adapt to compact form when needed.
 - Resizable dashboard, compact grid and slim ribbon. Labels disappear before metrics; the widget never scrolls.
@@ -61,8 +63,9 @@ The release includes .NET; no SDK or administrator access is needed. Executables
 | OpenCode Go | Sign in to Console through OpenCode v2; enable reuse | Read-only Console CLI quota; legacy Go API keys remain supported. See setup below. |
 | OpenRouter | Enable separately in Connections; reuse an existing environment key after opt-in | Documented key credit limit/remaining; no raw key labels or guessed reset. |
 | Claude subscription | Install Claude Code; choose **Sign in to Claude** and complete first-run setup | Built-in interactive `/usage` panel every five minutes, with hooks/MCP disabled and no model prompt. |
+| GitHub (optional) | Connections → GitHub; explicitly reuse GitHub CLI or save a fine-grained token in Windows Credential Manager | Official read-only personal/selected-organization billing and explicitly selected repository APIs. [Guide](docs/GITHUB.md). |
 
-Cursor and Go credential reuse is opt-in. Prism never asks for pasted tokens, never refreshes raw credentials, and sends them only to their own fixed HTTPS usage endpoints, refusing redirects. Authentication is managed by each provider's app/CLI.
+Cursor and Go credential reuse is opt-in. Prism never refreshes raw credentials and sends them only to their own fixed HTTPS usage endpoints, refusing redirects. Authentication is managed by each provider's app/CLI. GitHub additionally supports an optional masked fine-grained token stored only in Windows Credential Manager, never plaintext preferences.
 
 Optional Claude browser sync and status-line feed setup is in the included [connection guide](README.html). Multiple browser accounts require an explicit choice. API-key Claude sessions do not provide subscription quota.
 
@@ -106,7 +109,7 @@ Open the **Settings** icon or **Ctrl+,**. The dashboard remains free of scrollin
 | --- | --- |
 | General | Tray, optional Windows startup, edge snapping, 12/24-hour clock, language, opacity, connections and timezone settings |
 | Refresh rates | Separate provider intervals; caches and provider backoff remain authoritative |
-| Metrics | Check visible metrics, select a row and move it up/down; at least one metric must remain |
+| Metrics | Check visible metrics, select a row and move it up/down; an empty layout is allowed. GitHub has a dedicated per-metric and detail-only page. |
 | Alerts | Low-quota threshold, reset reminders, local history, capacity estimates and opt-in predictive alerts |
 | Profiles | Save/replace, load or delete up to 20 layouts; built-in Work/Gaming/Presentation starters |
 | Updates | Check GitHub, download a verified ZIP and open the downloads folder |

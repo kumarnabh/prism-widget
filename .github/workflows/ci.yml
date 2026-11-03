@@ -45,7 +45,7 @@ jobs:
           ./Build.ps1 -SkipDependencies
           # The expanded translated secondary-view exports approach 60s on hosted VMs.
           # Keep every assertion and a finite deadline; local default remains 60s.
-          ./scripts/verify-native.ps1 -TimeoutSeconds 120
+          ./scripts/verify-native.ps1 -TimeoutSeconds 180
       - name: Self-contained package boundary
         if: matrix.python == '3.14'
         shell: pwsh

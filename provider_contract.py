@@ -14,6 +14,10 @@ def text(value, maximum=120):
     return isinstance(value, str) and 0 < len(value) <= maximum and not any(ord(c) < 32 or ord(c) == 127 for c in value) and not PRIVATE.search(value)
 
 def normalize(provider, raw, now=None):
+    if provider['id'] == 'github':
+        from github_metrics import validate
+        try: return validate(raw, now)
+        except ValueError: return validate({'status': 'Unavailable', 'message': 'format'}, now)
     now = time.time() if now is None else now
     result = {'schema_version': 1, 'provider_id': provider['id'], 'display_name': provider['name'],
               'account_label': 'Default', 'capabilities': provider['capabilities'],

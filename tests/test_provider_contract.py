@@ -21,14 +21,14 @@ FIXTURES = json.loads((ROOT/'tests/fixtures/provider-responses.json').read_text(
 class ContractTests(unittest.TestCase):
     def test_every_adapter_normal_fixture(self):
         parsers={'codex':providers.normalize_codex,'cursor':auto_sources.parse_cursor,'opencode':auto_sources.parse_go,'claude':claude_cli.parse_screen,'openrouter':auto_sources.parse_openrouter}
-        for spec in manifest():
+        for spec in (p for p in manifest() if 'remaining' in p['capabilities']):
             with self.subTest(provider=spec['id']):
                 value=normalize(spec,{'status':'Live','at':1000,'windows':parsers[spec['id']](FIXTURES[spec['id']])},1000)
                 self.assertEqual(value['schema_version'],1);self.assertEqual(value['windows'][0]['remaining'],75)
                 self.assertNotIn('DO NOT FORWARD',json.dumps(value));self.assertEqual(value['source'],spec['source'])
 
     def test_every_adapter_contract_edge_cases(self):
-        for spec in manifest():
+        for spec in (p for p in manifest() if 'remaining' in p['capabilities']):
             good={'status':'Live','at':1000,'windows':[{'id':'session','label':'Session','remaining':42,'reset':2000}]}
             with self.subTest(provider=spec['id']):
                 for remaining in (0,100):
@@ -59,11 +59,18 @@ class ContractTests(unittest.TestCase):
             for error in (PermissionError('private account'),TimeoutError('private account'),ConnectionError('private account'),ValueError('format change')):
                 def collect(adapter):
                     if adapter.metadata['id']==failed: raise error
+                    if adapter.metadata['id']=='github':
+                        return {'status':'Live','at':time.time(),'scope':'a'*64,'period':'2026-11','metrics':[{'id':'github-spend','unit':'USD','value':5,'state':'Live'}]}
                     return {'status':'Live','at':time.time(),'windows':[{'label':'Session','remaining':50}]}
                 with self.subTest(provider=failed,error=type(error).__name__),patch('provider_registry.ProviderAdapter.collect',collect):
                     result=providers.collect(list(registry));self.assertEqual(result[failed]['status'],'Unavailable')
                     self.assertNotIn('private account',json.dumps(result))
-                    self.assertTrue(all(value['windows'] for key,value in result.items() if key!=failed))
+                    for key,value in result.items():
+                        if key==failed: continue
+                        if key=='github':
+                            self.assertEqual(value['windows'],[])
+                            self.assertEqual(value['metrics'][0]['value'],5)
+                        else: self.assertTrue(value['windows'])
 
     def test_single_provider_worker_keeps_cleanup_on_the_owning_thread(self):
         owner=threading.get_ident();cleaned=[]

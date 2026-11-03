@@ -28,7 +28,7 @@ public class App : Application
         if(!created){ActivateExisting(identity);return;}
         var app = new App();Theme.Select(diagnostic?"aurora":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).GlassTheme);
         L.Set(diagnostic?"en":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).Language);
-        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true;if(diagnostic)app.Shutdown(1); };
+        app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} if(offline){Directory.CreateDirectory(System.IO.Path.Combine(AppContext.BaseDirectory,"build"));File.WriteAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"build","offline-test-failure.txt"),e.Exception.ToString());}e.Handled=true;if(diagnostic)app.Shutdown(1); };
         if(!diagnostic&&!RuntimeSupport.Ready(AppContext.BaseDirectory)){app.Run(RuntimeSupport.SetupWindow(AppContext.BaseDirectory));return;}
         app.Run(new Widget(args.Contains("--preview"), args.Contains("--selftest")||offline,offline,args.Contains("--tray")));
     }
@@ -122,7 +122,7 @@ public sealed partial class Widget : Window
             UpdateSystem(); systemTimer.Start(); providerTimer.Start(); await UpdateProviders(true);
             if(preview || selftest) {
                 await System.Threading.Tasks.Task.Delay(5000); UpdateSystem();
-                if(selftest){providerChecks=await ProviderChecks.Verify();systemChecks=SystemCapacityChecks.Verify();forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
+                if(selftest){providerChecks=await ProviderChecks.Verify();systemChecks=SystemCapacityChecks.Verify();forecastChecks=ForecastChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));featureChecks=await FeatureChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));githubChecks=GitHubChecks.Verify(System.IO.Path.Combine(Root,"build","test-tmp"));RunSelfTest();}
                 SavePreview(); Close();
             }
         };
@@ -339,7 +339,7 @@ public sealed partial class Widget : Window
             }
         }
         foreach(string id in WidgetPreferences.ExtraMetricIds){var tile=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");metricTiles[id]=tile;var expanded=new MetricTile(MetricName(id),id=="gpu"?"▧":id=="battery"?"▰":id=="read"?"↓":id=="write"?"↑":id=="frequency"?"≋":"▥","#9FCFFF");expandedHardwareTiles[id]=expanded;expanded.Element.Cursor=Cursors.Hand;expanded.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();expanded.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};tile.Element.Cursor=Cursors.Hand;tile.Element.MouseLeftButtonUp+=(_,_)=>ShowSystemCapacity();tile.Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)ShowSystemCapacity();};}
-        metricBody.Children.Add(metricGrid);metricBody.Children.Add(emptyMetrics);
+        BuildGitHubTiles();metricBody.Children.Add(metricGrid);metricBody.Children.Add(emptyMetrics);
     }
     void SyncMetricValues()
     {
@@ -348,6 +348,7 @@ public sealed partial class Widget : Window
         metricTiles["disk"].Set(diskReady?$"{freeDiskGb:0.0} GB":"—",L.T("Free disk")+" · "+diskValue.Text,diskReady?diskBar.Value:null,health:diskReady?"ready":"unknown");
         metricTiles["net"].Set(netValue.Text.Replace(" KB/s","K").Replace(" MB/s","M"),"Network download / upload · "+netValue.Text,null,health:netValue.Text!="—"?"ready":"unknown");
         SyncHardwareTiles();
+        SyncGitHubTiles();
         foreach(var (key,card) in cards)metricTiles[key].Set(card.CompactValue,card.Element.ToolTip?.ToString()??key,card.Remaining,health:card.Health);
     }
     void AdaptLayout(bool forceGrid=false)
@@ -457,7 +458,7 @@ public sealed partial class Widget : Window
     void SavePosition(){try{var display=DesktopLayout.Current(this);LocalJson.Save(System.IO.Path.Combine(Data,"window.json"),new WindowPlacement(Left,Top,Topmost,Width,Height,metricsOnly?expandedHeight:Height,compact,display.Id,Left-display.Work.Left,Top-display.Work.Top));}catch(IOException){}catch(UnauthorizedAccessException){}}
     void UpdateSystem()
     {
-        UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();
+        UpdateClocks();RefreshDisplayedProviders();CheckResetReminders();CheckLowQuota();CheckCapacityAlerts();CheckGitHubAlerts();
         ReadSystemSnapshot();ReconcileMetricVisibility();if(!metricsOnly&&IsVisible)SyncHardwareTiles();if(metricsOnly&&IsVisible&&WindowState==WindowState.Normal)SyncMetricValues();UpdateTaskbarProgress();taskbarPreview?.Invalidate();
         // Values update while hidden/minimized; resize/density work runs on actual layout changes.
         if(IsVisible&&WindowState==WindowState.Normal){cpuGraph.SetSamples(cpuHistory);ramGraph.SetSamples(ramHistory);}
@@ -755,9 +756,9 @@ public sealed partial class Widget : Window
                 }
             }
         }
-        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();VerifySystemViews();VerifyProviderViews();
+        preferences=originalPreferences;L.Set("en");ApplyMetricPreferences();clockPreferences=oldClocks;VerifyCapacityViews();VerifySystemViews();VerifyProviderViews();VerifyGitHubViews();
         Width=oldWidth;Height=oldHeight;Left=oldLeft;Top=oldTop;expandedHeight=oldExpandedHeight;compact=oldCompact;UpdateLayout();AdaptLayout();UpdateLayout();
-        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,systemChecks,providerChecks,systemLayouts,ecosystemLayouts,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
+        File.WriteAllText(System.IO.Path.Combine(Root,"selftest.json"),JsonSerializer.Serialize(new{pin=pinOk,compact=compactOk,quotaValidation,presets,clocks,reminders,featureChecks,forecastChecks,systemChecks,providerChecks,githubChecks,githubLayouts,systemLayouts,ecosystemLayouts,featureOpenTimes,forecast40kMs=ForecastChecks.BenchmarkMilliseconds,customized,sensors,responsive=fits,layouts,transitions,offline,hdLogicalWidth,hdLogicalHeight,providers=providers.ValueKind==JsonValueKind.Object,cpu=cpuValue.Text,memory=ramDetail.Text,drive=diskValue.Text}));
     }
     (bool fits,bool controls,double scale) CheckLayout()
     {
@@ -774,7 +775,7 @@ public sealed partial class Widget : Window
         bool controls=actions.Buttons.Count==3&&actions.Buttons.All(Inside)&&RowFits(actions.Element)&&RowFits(header)
             &&(!(metricsOnly||ActualWidth<430||ActualHeight<760)||actions.IconsOnly)
             &&(metricsOnly||RowFits(section));
-        IEnumerable<FrameworkElement> content=metricsOnly?metricTiles.Values.Select(tile=>(FrameworkElement)tile.Element):cards.Values.Select(card=>(FrameworkElement)card.Element).Concat(new FrameworkElement[]{cpuPanel,ramPanel,extras,section,bottom});
+        IEnumerable<FrameworkElement> content=metricsOnly?metricTiles.Values.Select(tile=>(FrameworkElement)tile.Element):cards.Values.Select(card=>(FrameworkElement)card.Element).Concat(expandedHardware.Children.OfType<FrameworkElement>()).Concat(new FrameworkElement[]{cpuPanel,ramPanel,extras,section,bottom});
         if(clockPreferences.Enabled)content=content.Concat(metricsOnly?new FrameworkElement[]{compactTimes}:new FrameworkElement[]{firstClock,secondClock});
         var bounds=Bounds(body);double scale=bounds.Width/body.ActualWidth;
         return(content.Where(el=>el.Visibility==Visibility.Visible).All(Inside)&&bounds.Bottom<=ActualHeight-10&&bounds.Right<=ActualWidth-10,controls,Math.Round(scale,3));

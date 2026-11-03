@@ -3,11 +3,12 @@
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <AssemblyName>Prism</AssemblyName><RootNamespace>Prism</RootNamespace>
-    <Version>2.2.0</Version>
+    <Version>2.3.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>../assets/prism.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup><Resource Include="../assets/prism.ico" Link="Assets/prism.ico" /></ItemGroup>
   <ItemGroup><Resource Include="../assets/prism-icon.png" Link="Assets/prism-icon.png" /></ItemGroup>
   <ItemGroup><EmbeddedResource Include="../provider-manifest.json" LogicalName="Prism.Providers.json" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../github-metrics.json" LogicalName="Prism.GitHubMetrics.json" /></ItemGroup>
 </Project>
