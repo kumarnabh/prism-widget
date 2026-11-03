@@ -71,6 +71,7 @@ class BoundaryTests(unittest.TestCase):
         values,_=gh.billing({'usageItems':rows},PERIOD)
         self.assertEqual(values['github-actions-minutes'],150)
         self.assertEqual(values['github-actions-spend'],.4)
+        self.assertEqual(values['github-actions-storage'],2)
         self.assertAlmostEqual(values['github-spend'],3.2)
         self.assertEqual(values['github-packages-storage'],24)
         self.assertEqual(values['github-packages-transfer'],3)
@@ -79,6 +80,25 @@ class BoundaryTests(unittest.TestCase):
         self.assertEqual(values['github-lfs-storage'],12)
         self.assertEqual(values['github-lfs-bandwidth'],2)
         self.assertNotIn('github-actions-allowance',values)
+
+    def test_account_storage_sums_repositories_without_mixing_units_or_products(self):
+        rows=[item('Actions','Actions Artifact Storage',24,'GB-hours',0,repositoryName='fixture/one'),
+              item('Actions','Actions Cache Storage',48,'GB-hr',0,repositoryName='fixture/two'),
+              item('Actions','Actions Storage',0,'GB-hours',0),
+              item('Actions','Actions Storage',99,'GB',0),
+              item('Packages','Packages Storage',100,'GB-hours',0),
+              item('Actions','Actions Linux',5,'minutes',0)]
+        values,_=gh.billing({'usageItems':rows},PERIOD)
+        self.assertEqual(values['github-actions-storage'],72)
+        self.assertEqual(values['github-actions-minutes'],5)
+        self.assertEqual(values['github-packages-storage'],100)
+        result=validate({**reading(),'metrics':[{'id':'github-actions-storage','unit':'GB-hours','value':72,'state':'Live','source':'billing'}]})
+        self.assertEqual(result['metrics'][0]['unit'],'GB-hours')
+        for rows in ([],[item('Actions','Actions Storage',1,'GB',0)]):
+            values,_=gh.billing({'usageItems':rows},PERIOD)
+            self.assertNotIn('github-actions-storage',values)
+        values,_=gh.billing({'usageItems':[item('Actions','Actions Storage',0,'GB-hours',0)]},PERIOD)
+        self.assertEqual(values['github-actions-storage'],0)
 
     def test_free_paid_unknown_allowances_and_report_zero(self):
         for plan in ('free','pro','team','enterprise'):

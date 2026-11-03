@@ -2,6 +2,10 @@
 
 GitHub is optional, off and invisible by default. Nothing is written to GitHub. No workflows, model calls, billing changes, artifact deletions or repository mutations are performed.
 
+For monthly account totals, select **Account Actions minutes** and **Actions storage accrued** in Settings → Metrics → GitHub. These use the personal account's billing report (or the explicitly configured organization's report) across its billed repositories, independently of the repository selection. Storage is accrued **GB-hours**, not the amount currently stored or allowance remaining. Free/public runner usage absent from billing reports is not included. Missing storage rows or unsupported units remain unknown. The separate Actions artifacts/cache metrics describe current bytes in selected repositories.
+
+Personal billing requires **Plan (read)** user permission. A normal GitHub CLI OAuth sign-in can still read repository statistics but may be denied access to billing. Prism keeps account billing values unavailable in that case; CLI sign-in alone does not grant billing access. Use a compatible fine-grained credential through Connections if billing permission is unavailable; enter it only in the local masked credential field, never in JSON or chat.
+
 ## Connect
 
 Open **Connections → GitHub → Connect / disconnect**. Enable collection and explicitly choose a sign-in source. With GitHub CLI installed, run `gh auth login --hostname github.com` yourself, then choose **GitHub CLI**. Use `gh auth status --hostname github.com` to inspect your sign-in. Prism captures `gh auth token` privately in memory and verifies it through the bounded authenticated-user endpoint; command output and credentials are never forwarded to Prism stdout, diagnostics or logs. Environment token overrides are ignored so the selected CLI account is authoritative. Prism never changes the CLI's scopes or signs you out. After `gh auth switch --hostname github.com`, refresh Prism.
