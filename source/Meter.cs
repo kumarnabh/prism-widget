@@ -19,11 +19,11 @@ public sealed class Meter : FrameworkElement
         base.OnRender(drawing);
         double width=ActualWidth,height=ActualHeight;
         if(width<=0||height<=0)return;
-        drawing.DrawRoundedRectangle(background,null,new Rect(0,0,width,height),height/2,height/2);
+        drawing.DrawRoundedRectangle(Theme.Adapt(background),null,new Rect(0,0,width,height),height/2,height/2);
         if(value<=0)return;
         // Keep a visible rounded cap for small non-zero values.
         var fill=new Rect(0,0,Math.Max(Math.Min(width,height),width*value/100),height);
-        drawing.DrawRoundedRectangle(foreground,null,fill,height/2,height/2);
+        drawing.DrawRoundedRectangle(Theme.Adapt(foreground),null,fill,height/2,height/2);
         if(height>=3)drawing.DrawRoundedRectangle(Gloss,null,fill,height/2,height/2);
     }
 }
@@ -35,7 +35,7 @@ public sealed class UsageGauge : FrameworkElement
     public UsageGauge(string color)
     {
         var tone=(Color)ColorConverter.ConvertFromString(color);
-        accent=new SolidColorBrush(tone);halo=new SolidColorBrush(Color.FromArgb(46,tone.R,tone.G,tone.B));accent.Freeze();halo.Freeze();
+        accent=Theme.Solid(tone);halo=Theme.Solid(Color.FromArgb(46,tone.R,tone.G,tone.B));accent.Freeze();halo.Freeze();
         Width=Height=44;IsHitTestVisible=false;
     }
     public void Set(double? value){this.value=value is double n&&double.IsFinite(n)?Math.Clamp(n,0,100):null;InvalidateVisual();}
@@ -43,11 +43,11 @@ public sealed class UsageGauge : FrameworkElement
     {
         base.OnRender(drawing);
         var center=new Point(ActualWidth/2,ActualHeight/2);double radius=Math.Max(0,Math.Min(ActualWidth,ActualHeight)/2-4);
-        var track=new Pen(new SolidColorBrush(Color.FromArgb(38,166,190,219)),3);
+        var track=new Pen(Theme.Solid(Color.FromArgb(38,166,190,219)),3);
         drawing.DrawEllipse(null,track,center,radius,radius);
         if(value is not double n||n<=0)return;
-        var glow=new Pen(halo,7){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};
-        var pen=new Pen(accent,3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};
+        var glow=new Pen(Theme.Adapt(halo),7){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};
+        var pen=new Pen(Theme.Adapt(accent),3){StartLineCap=PenLineCap.Round,EndLineCap=PenLineCap.Round};
         if(n>=100){drawing.DrawEllipse(null,glow,center,radius,radius);drawing.DrawEllipse(null,pen,center,radius,radius);return;}
         double angle=n/100*Math.PI*2;
         var arc=new StreamGeometry();using(var path=arc.Open()){

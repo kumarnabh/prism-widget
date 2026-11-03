@@ -1,0 +1,20 @@
+[
+  {"id":"github-actions-spend","name":"Actions compute","unit":"USD","category":"currency","description":"Net reported runner compute charges after discounts; excludes storage."},
+  {"id":"github-actions-allowance","name":"Actions allowance left","unit":"%","category":"allowance","description":"Unknown: billing usage reports do not expose an authoritative included allowance."},
+  {"id":"github-actions-minutes","name":"Actions minutes","unit":"minutes","category":"count","description":"Reported billing runner minutes, not workflow wall time or all free/public usage."},
+  {"id":"github-runs","name":"Workflow executions","unit":"runs","category":"count","description":"Current-month workflow runs in explicitly selected repositories; rerun attempts are not separate executions."},
+  {"id":"github-successes","name":"Workflow successes","unit":"runs","category":"count","description":"Selected repository runs with conclusion success."},
+  {"id":"github-failures","name":"Workflow failures","unit":"runs","category":"count","description":"Selected repository runs with conclusion failure; cancelled/timed-out runs are not counted as failures."},
+  {"id":"github-artifacts","name":"Actions artifacts","unit":"bytes","category":"storage","description":"Sum of non-expired artifact bytes in selected repositories; not metered GB-hours or invoice storage."},
+  {"id":"github-cache","name":"Actions cache","unit":"bytes","category":"storage","description":"Current cache bytes in selected repositories; GitHub may delay updates by five minutes."},
+  {"id":"github-packages-storage","name":"Packages storage","unit":"GB-hours","category":"storage","description":"Reported metered storage; never interpreted as current stored GB."},
+  {"id":"github-packages-transfer","name":"Packages transfer","unit":"GB","category":"transfer","description":"Reported billing data transfer; missing or incompatible units remain unknown."},
+  {"id":"github-codespaces-compute","name":"Codespaces compute","unit":"core-hours","category":"compute","description":"Reported core-hours only; machine-hours with unknown core counts stay unknown."},
+  {"id":"github-codespaces-storage","name":"Codespaces storage","unit":"GB-hours","category":"storage","description":"Reported metered Codespaces storage, not current stored GB."},
+  {"id":"github-lfs-storage","name":"Git LFS storage","unit":"GB-hours","category":"storage","description":"Reported metered LFS storage when the billing report uses GB-hours."},
+  {"id":"github-lfs-bandwidth","name":"Git LFS bandwidth","unit":"GB","category":"transfer","description":"Reported LFS bandwidth when available."},
+  {"id":"github-spend","name":"Month billable spend","unit":"USD","category":"currency","description":"Net metered charges in the current UTC calendar-month report; excludes subscriptions, taxes and invoice adjustments."},
+  {"id":"github-repository-spend","name":"Repository billable spend","unit":"USD","category":"currency","description":"Net charges attributed to repositories in the billing report; private repository breakdown in details."},
+  {"id":"github-forecast","name":"Estimated month spend","unit":"USD","category":"forecast","description":"Local low-confidence trend estimate requiring six regular fresh observations over at least 30 minutes."},
+  {"id":"github-exhaustion","name":"Local target reached in","unit":"hours","category":"forecast","description":"Local low-confidence estimate to an explicit currency target; never a GitHub-enforced limit."}
+]

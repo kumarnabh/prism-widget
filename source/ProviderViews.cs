@@ -34,7 +34,7 @@ public sealed partial class Widget
     }
     void VerifyProviderViews()
     {
-        var saved=preferences.Copy();var previousHardware=hardwareFixture;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);var now=DateTimeOffset.UtcNow;
+        var saved=preferences.Copy();bool savedGitHubConsent=githubConnected;githubConnected=true;var previousHardware=hardwareFixture;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);var now=DateTimeOffset.UtcNow;
         foreach(string state in new[]{"Connect","Unavailable"}){using var error=JsonDocument.Parse(JsonSerializer.Serialize(new{status=state,detail="Connection guidance fixture",windows=Array.Empty<object>()}));cards["codex"].Update(error.RootElement);if(cards["codex"].Remaining is not null||!cards["codex"].Element.ToolTip.ToString()!.Contains("Connection guidance fixture"))throw new InvalidOperationException("Empty quota preserves connection guidance");}
         preferences.DisabledProviders.Clear();preferences.VisibleMetrics=WidgetPreferences.MetricIds.ToList();preferences.ActiveProvidersOnly=false;VerifyCursorDisplay(now);
         var metrics=new[]{new SystemMetric("cpu","CPU",24,"%",24,now),new("ram","Memory",58,"%",58,now,Details:"9.3 / 16 GB"),new("disk","Free disk",240," GB",48,now),new("net","Network",1048576," B/s",null,now,Details:"524288")}.Concat(WidgetPreferences.ExtraMetricIds.Select(id=>new SystemMetric(id,MetricName(id),id=="frequency"?3.4:id=="vram"?3.1:35,id is "gpu" or "battery"?"%":id=="frequency"?" GHz":id=="vram"?" GB":" MB/s",id is "gpu" or "battery"?35:id=="vram"?38.75:null,now))).ToArray();
@@ -50,7 +50,7 @@ public sealed partial class Widget
                 if(language=="en")SavePreview($"preview-ecosystem-{(int)size.Item1}x{(int)size.Item2}.png",2);
             }
         }
-        preferences=saved;hardwareFixture=previousHardware;providerData.Clear();foreach(var item in savedData)providerData[item.Key]=item.Value;L.Set("en");ApplyMetricPreferences();
+        preferences=saved;githubConnected=savedGitHubConsent;hardwareFixture=previousHardware;providerData.Clear();foreach(var item in savedData)providerData[item.Key]=item.Value;L.Set("en");ApplyMetricPreferences();
     }
     void ShowProviders()
     {
@@ -59,6 +59,7 @@ public sealed partial class Widget
         bool dismissed=false;dialog.Closed+=(_,_)=>dismissed=true;
         panel.Children.Add(Text("Connections and providers",24));panel.Children.Add(Text("Read-only sources. Authentication stays with your provider.",12,Muted));
         foreach(var definition in ProviderCatalog.All){
+            if(definition.Id=="github"){AddGitHubConnectionCard(panel);continue;}
             string id=definition.Id;var now=DateTimeOffset.UtcNow;var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;
             var content=new StackPanel();content.Children.Add(Text(definition.Name,18));
             bool enabled=!preferences.DisabledProviders.Contains(id);
@@ -94,13 +95,14 @@ public sealed partial class Widget
     }
     async Task UpdateProvider(string id)
     {
-        if(closed||preferences.DisabledProviders.Contains(id)||!collecting.Add(id))return;
+        if(closed||preferences.DisabledProviders.Contains(id)||id=="github"&&!githubConnected||!collecting.Add(id))return;
         using var request=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);providerRequests[id]=request;
         busy=true;schedule.Mark(new[]{id},DateTimeOffset.UtcNow,preferences);
         try{
             var data=await ProviderRunner.Collect(Root,id,request.Token);request.Token.ThrowIfCancellationRequested();
             if(closed||preferences.DisabledProviders.Contains(id))return;
             providerData[id]=data;var now=DateTimeOffset.UtcNow;var reading=QuotaSnapshot.Read(data,now);
+            if(id=="github")RecordGitHub(data,now);
             if(UsageHistory.Fresh(reading,now)&&reading.Captured.HasValue)lastSuccess[id]=reading.Captured.Value;
             if(!preview&&!selftest&&preferences.HistoryEnabled&&history.Record(id,reading,now))try{history.Save(HistoryPath);}catch(IOException){}catch(UnauthorizedAccessException){}
         }catch(Exception){if(!closed){providerData.Remove(id);latestReadings.Remove(ProviderName(id));cards[id].MarkOffline();}}

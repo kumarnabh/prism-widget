@@ -61,6 +61,12 @@ def collect_example():
 
 Add the reviewed function/import to the explicit registry dispatch, then one manifest row. Add any new adapter file to the package allowlist. New authentication must default off unless it can safely reuse a provider-owned CLI without reading/reusing credentials itself. Keep consent separate from dashboard visibility. Do not ask for pasted keys or create a credential manager.
 
+GitHub 2.3 is a reviewed exception for a masked optional fine-grained token using Windows Credential Manager; plaintext token preferences are prohibited. Its preferred source remains explicit GitHub CLI reuse. See [GitHub setup and permission boundaries](GITHUB.md).
+
+## Additive typed metrics
+
+GitHub retains `schema_version: 1` and an empty `windows` array, and adds `metrics`, `period`, `scope` and private `repositories` summaries with opaque scopes and validated repository names. Each reviewed metric ID has a fixed unit/category in `github-metrics.json`; values are finite, nonnegative numbers or null with explicit state. Currency is USD only for this documented report. A missing allowance remains unknown. `github_metrics.validate` and native `GitHubReading.Read` independently validate timestamp, scope, period, IDs, states, units, ranges, duplicates and summary bounds. Arbitrary labels/messages are never forwarded; the reviewed GitHub repository-name field is validated independently and restricted to private details/cache, never diagnostics. Existing quota providers continue using the original contract and ten-minute freshness rule; GitHub has an independent one-hour freshness boundary. `typed_metrics` is a manifest capability, not executable remote metadata.
+
 ## Credentials, network and cache rules
 
 Reuse provider CLI/session authentication whenever possible. Opt-in HTTP reuse sends credentials only to exact approved HTTPS endpoints, refuses redirects, limits response bytes and uses finite deadlines. Never log exception bodies, command lines, account identity, authorization headers or arbitrary API labels. No model calls, account mutations, registration, analytics or key refresh.

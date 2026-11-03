@@ -8,7 +8,11 @@ public sealed class WidgetPreferences
     public static readonly string[] BaseMetricIds={"cpu","ram","disk","net","codex","cursor","opencode","claude"};
     public static readonly string[] ExtraMetricIds={"gpu","vram","frequency","battery","read","write"};
     public static readonly string[] ProviderIds=ProviderCatalog.All.Select(p=>p.Id).ToArray();
-    public static readonly string[] MetricIds=BaseMetricIds.Concat(ProviderIds).Concat(ExtraMetricIds).Distinct().ToArray();
+    public static readonly string[] MetricIds=BaseMetricIds.Concat(ProviderIds.Where(id=>id!="github")).Concat(ExtraMetricIds).Concat(GitHubCatalog.Ids).Distinct().ToArray();
+    public List<string> GitHubDetailsOnly {get;set;}=new();
+    public Dictionary<string,double> GitHubTargets {get;set;}=new();
+    public List<string> GitHubAlertMetrics {get;set;}=new();
+    public List<int> GitHubAlertPercents {get;set;}=new(){75,90,100};
     public List<string> DisabledProviders {get;set;}=ProviderCatalog.All.Where(p=>!p.Enabled).Select(p=>p.Id).ToList();
     public bool TrayEnabled {get;set;}=true;
     public bool SnapEdges {get;set;}=true;
@@ -22,6 +26,7 @@ public sealed class WidgetPreferences
     public int LowQuotaThreshold {get;set;}=20;
     public bool Use24Hour {get;set;}=true;
     public string Language {get;set;}="en";
+    public string GlassTheme {get;set;}="aurora";
     public double Opacity {get;set;}=1;
     public List<string> MetricOrder {get;set;}=MetricIds.ToList();
     public List<string> VisibleMetrics {get;set;}=BaseMetricIds.ToList();
@@ -29,12 +34,17 @@ public sealed class WidgetPreferences
     public void Normalize()
     {
         if(!new[]{"en","hi","es","fr"}.Contains(Language))Language="en";
+        if(!Theme.Ids.Contains(GlassTheme))GlassTheme="aurora";
         if(!double.IsFinite(Opacity))Opacity=1;Opacity=Math.Clamp(Opacity,.65,1);
         LowQuotaThreshold=Math.Clamp(LowQuotaThreshold,1,50);
-        if(!new[]{"none","cpu","ram","gpu","battery"}.Concat(ProviderIds).Contains(TaskbarMetric))TaskbarMetric="none";
+        if(!new[]{"none","cpu","ram","gpu","battery"}.Concat(ProviderIds.Where(id=>id!="github")).Contains(TaskbarMetric))TaskbarMetric="none";
         MetricOrder=(MetricOrder??new()).Where(MetricIds.Contains).Distinct().Concat(MetricIds).Distinct().ToList();
         VisibleMetrics=(VisibleMetrics??new()).Where(MetricIds.Contains).Distinct().ToList();
         DisabledProviders=(DisabledProviders??new()).Where(ProviderIds.Contains).Distinct().ToList();
+        GitHubDetailsOnly=(GitHubDetailsOnly??new()).Where(GitHubCatalog.Ids.Contains).Distinct().ToList();
+        GitHubTargets=(GitHubTargets??new()).Where(p=>GitHubCatalog.Ids.Contains(p.Key)&&GitHubCatalog.Get(p.Key).Category is not ("forecast" or "allowance")&&double.IsFinite(p.Value)&&p.Value>0&&p.Value<=1e12).ToDictionary(p=>p.Key,p=>p.Value);
+        GitHubAlertMetrics=(GitHubAlertMetrics??new()).Where(GitHubTargets.ContainsKey).Distinct().ToList();
+        GitHubAlertPercents=(GitHubAlertPercents??new()).Where(p=>p is 75 or 90 or 100).Distinct().Order().ToList();
         RefreshSeconds??=new();
         RefreshSeconds=ProviderIds.ToDictionary(id=>id,id=>Math.Clamp(RefreshSeconds.GetValueOrDefault(id,ProviderCatalog.Get(id).Interval),60,3600));
     }
@@ -66,7 +76,7 @@ public sealed class ProviderSchedule
     public void Reset()=>next.Clear();
 }
 
-public sealed record LayoutProfile(string Name,double Width,double Height,bool Compact,bool Pinned,double Opacity,List<string> Order,List<string> Visible,ClockPreferences Clocks);
+public sealed record LayoutProfile(string Name,double Width,double Height,bool Compact,bool Pinned,double Opacity,List<string> Order,List<string> Visible,ClockPreferences Clocks,List<string>? GitHubDetailsOnly=null,string GlassTheme="aurora");
 public sealed class ProfileStore
 {
     public List<LayoutProfile> Items {get;set;}=new();

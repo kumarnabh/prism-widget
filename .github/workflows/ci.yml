@@ -43,9 +43,9 @@ jobs:
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./Setup.ps1 -SkipLaunch -SkipOpenCode
           if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
           ./Build.ps1 -SkipDependencies
-          # The expanded translated secondary-view exports approach 60s on hosted VMs.
-          # Keep every assertion and a finite deadline; local default remains 60s.
-          ./scripts/verify-native.ps1 -TimeoutSeconds 120
+          # Translated secondary views and GitHub/theme exports exceed 60s on hosted VMs.
+          # Keep every assertion and a finite deadline; local default is 120s.
+          ./scripts/verify-native.ps1 -TimeoutSeconds 180
       - name: Self-contained package boundary
         if: matrix.python == '3.14'
         shell: pwsh

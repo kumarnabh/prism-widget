@@ -21,6 +21,8 @@ public sealed partial class Widget
     void InitializeFeatures(bool startInTray)
     {
         Opacity=preferences.Opacity;ApplyMetricPreferences();
+        if(!preview&&!selftest)githubHistory=GitHubHistory.Load(GitHubHistoryPath,DateTimeOffset.UtcNow);
+        if(!preview&&!selftest)githubConnected=LocalJson.Load<GitHubConnection>(GitHubConnectionPath,20000)?.Enabled==true;
         if(!preview&&!selftest){history=UsageHistory.Load(File.Exists(HistoryPath)?HistoryPath:System.IO.Path.Combine(Data,"usage-history.json"),DateTimeOffset.UtcNow);notifications=LocalJson.Load<NotificationState>(System.IO.Path.Combine(Data,"notification-state.json"))??new();lowAlerts=LowQuotaAlerts.Load(System.IO.Path.Combine(Data,"low-alerts.json"));profiles=ProfileStore.Load(System.IO.Path.Combine(Data,"profiles.json"));}
         if(profiles.Items.Count==0){
             profiles.Items.Add(new("Work",442,858,false,true,1,WidgetPreferences.MetricIds.ToList(),WidgetPreferences.BaseMetricIds.ToList(),new(true)));
@@ -72,6 +74,8 @@ public sealed partial class Widget
     void ApplyMetricPreferences()
     {
         preferences.Normalize();metricGrid.Children.Clear();providerGrid.Children.Clear();
+        foreach(var tile in metricTiles.Values)tile.Element.Visibility=Visibility.Collapsed;
+        foreach(var card in cards.Values)card.Element.Visibility=Visibility.Collapsed;
         foreach(string id in preferences.MetricOrder){
             bool visible=MetricVisible(id);metricTiles[id].Element.Visibility=visible?Visibility.Visible:Visibility.Collapsed;
             if(visible)metricGrid.Children.Add(metricTiles[id].Element);
@@ -91,6 +95,8 @@ public sealed partial class Widget
     }
     bool MetricVisible(string id)
     {
+        if(id=="github")return false;
+        if(GitHubCatalog.Ids.Contains(id))return githubConnected&&preferences.VisibleMetrics.Contains(id)&&!preferences.DisabledProviders.Contains("github")&&!preferences.GitHubDetailsOnly.Contains(id);
         if(!preferences.VisibleMetrics.Contains(id)||preferences.DisabledProviders.Contains(id))return false;var now=DateTimeOffset.UtcNow;var sample=Hardware;
         if(id=="battery"&&sample.BatteryPresent==false&&now>=sample.At&&now-sample.At<=TimeSpan.FromSeconds(20))return false;
         return !preferences.ActiveProvidersOnly||!WidgetPreferences.ProviderIds.Contains(id)||providerData.TryGetValue(id,out var data)&&QuotaSnapshot.Read(data,now).Windows.Count>0;
@@ -98,7 +104,7 @@ public sealed partial class Widget
     void ReconcileMetricVisibility(){if(preferences.MetricOrder.Any(id=>metricTiles[id].Element.Visibility!=(MetricVisible(id)?Visibility.Visible:Visibility.Collapsed))){ApplyMetricPreferences();AdaptLayout();}}
     void RefreshDisplayedProviders()
     {
-        if(offline)return;var now=DateTimeOffset.UtcNow;latestReadings.Clear();RefreshForecasts();
+        SyncGitHubTiles();if(offline)return;var now=DateTimeOffset.UtcNow;latestReadings.Clear();RefreshForecasts();
         foreach(var (id,card) in cards){
             if(providerData.TryGetValue(id,out var data)){
                 var reading=QuotaSnapshot.Read(data,now);
@@ -114,7 +120,7 @@ public sealed partial class Widget
             string forecastText=preferences.ForecastEnabled?string.Join("\n",forecasts.Where(p=>p.Key.StartsWith(id+"\u001f",StringComparison.Ordinal)).Select(p=>p.Value.Describe())):"";
             card.Element.ToolTip=info+"\u2063\n"+L.F("Next check: {0}",countdown)+(forecastText.Length>0?"\n"+forecastText:"");
         }
-        var enabled=WidgetPreferences.ProviderIds.Where(id=>!preferences.DisabledProviders.Contains(id)).ToArray();
+        var enabled=WidgetPreferences.ProviderIds.Where(id=>id!="github"&&!preferences.DisabledProviders.Contains(id)).ToArray();
         if(!busy){string next=string.Join(" · ",enabled.Select(id=>ProviderName(id)+" "+TimeSpan.FromSeconds(schedule.Remaining(id,now)).ToString(@"h\:mm\:ss")));footer.Text=L.F("{0} of {1} sources current",enabled.Count(id=>cards[id].Health=="ready"),enabled.Length)+" · ↻ "+TimeSpan.FromSeconds(enabled.Select(id=>schedule.Remaining(id,now)).DefaultIfEmpty(0).Min()).ToString(@"m\:ss");footer.ToolTip=L.F("Next check: {0}",next);foreach(var button in refreshButtons)button.ToolTip=footer.ToolTip;}
     }
     void CheckLowQuota()
@@ -130,10 +136,10 @@ public sealed partial class Widget
     readonly Dictionary<string,double> featureOpenTimes=new();
     Window FeatureWindow(string title,double width=660,double height=660)
     {
-        var opened=Stopwatch.StartNew();var dialog=new Window{Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var opened=Stopwatch.StartNew();var dialog=new Window{Title="Prism · "+L.T(title),Owner=this,Width=width,Height=height,MaxWidth=SystemParameters.WorkArea.Width-24,MaxHeight=SystemParameters.WorkArea.Height-40,MinWidth=380,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),FontFamily=FontFamily};
         if(selftest)dialog.Loaded+=(_,_)=>featureOpenTimes[title+"-"+L.Language]=opened.Elapsed.TotalMilliseconds;return dialog;
     }
-    static CheckBox Check(StackPanel panel,string label,bool value){var box=new CheckBox{Content=L.T(label),IsChecked=value,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,7,0,7)};panel.Children.Add(box);return box;}
+    static CheckBox Check(StackPanel panel,string label,bool value){var box=new CheckBox{Content=L.T(label),IsChecked=value,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,7,0,7)};panel.Children.Add(box);return box;}
     static ComboBox Choose(StackPanel panel,string label,IEnumerable<object> values,object selected){panel.Children.Add(Text(label,12,Muted));var combo=new ComboBox{ItemsSource=values,SelectedItem=selected,Margin=new Thickness(0,6,0,14),MinWidth=220};System.Windows.Automation.AutomationProperties.SetName(combo,L.T(label));panel.Children.Add(combo);return combo;}
     void ShowPreferences()
     {
@@ -144,8 +150,10 @@ public sealed partial class Widget
         var general=Tab("General");
         var trayCheck=Check(general,"Enable system tray",preferences.TrayEnabled);var startup=Check(general,"Start with Windows",StartupRegistration.Enabled);var snap=Check(general,"Snap to screen edges",preferences.SnapEdges);var hours=Check(general,"Use 24-hour time",preferences.Use24Hour);
         var minimizeCheck=Check(general,"Minimize to tray",preferences.MinimizeToTray);general.Children.Add(Button("Minimize to taskbar","Minimize to taskbar",()=>{dialog.Close();MinimizeToTaskbar();}));general.Children.Add(Button("Taskbar ribbon","Taskbar ribbon",()=>{dialog.Close();DockRibbon();}));
-        var taskbarIds=new[]{"none","cpu","ram","gpu","battery"}.Concat(WidgetPreferences.ProviderIds).ToArray();var taskbarNames=taskbarIds.Select(id=>L.T(id=="none"?"None":MetricName(id))).ToArray();var taskbarChoice=Choose(general,"Taskbar bar metric",taskbarNames,taskbarNames[Array.IndexOf(taskbarIds,preferences.TaskbarMetric)]);
+        var taskbarIds=new[]{"none","cpu","ram","gpu","battery"}.Concat(WidgetPreferences.ProviderIds.Where(id=>id!="github")).ToArray();var taskbarNames=taskbarIds.Select(id=>L.T(id=="none"?"None":MetricName(id))).ToArray();var taskbarChoice=Choose(general,"Taskbar bar metric",taskbarNames,taskbarNames[Array.IndexOf(taskbarIds,preferences.TaskbarMetric)]);
         var languageNames=new[]{"English","हिन्दी","Español","Français"};var languageIds=new[]{"en","hi","es","fr"};var language=Choose(general,"Language",languageNames,languageNames[Array.IndexOf(languageIds,preferences.Language)]);
+        var glassTheme=Choose(general,"Glass theme",Theme.Names,Theme.Names[Array.IndexOf(Theme.Ids,preferences.GlassTheme)]);
+        general.Children.Add(Text("Clear glass uses neutral shades throughout the widget. Status remains available in text, tooltips and details.",11,Muted));
         general.Children.Add(Text("Opacity",12,Muted));var opacity=new Slider{Minimum=.65,Maximum=1,Value=preferences.Opacity,TickFrequency=.05,IsSnapToTickEnabled=true,Margin=new Thickness(0,8,0,16)};general.Children.Add(opacity);
         general.Children.Add(Button("Connections…","Connections…",()=>{dialog.Close();ShowProviders();}));general.Children.Add(Button("World clocks…","World clocks…",()=>{dialog.Close();ShowClocks();}));
         general.Children.Add(Text("Startup is optional and uses only your Windows account. Closing Prism exits; Hide to tray keeps monitoring.",11,Muted));
@@ -155,8 +163,9 @@ public sealed partial class Widget
         var metrics=Tab("Metrics");metrics.Children.Add(Text("Choose visible metrics and their order. The compact grid uses the full order; the dashboard keeps paired system groups and orders AI cards.",12,Muted));
         var activeOnly=Check(metrics,"Only active AI subscriptions",preferences.ActiveProvidersOnly);metrics.Children.Add(Text("Active means a provider has quota windows. Prism cannot verify paid subscription entitlement. Stale readings remain marked stale.",11,Muted));
         var ordered=preferences.MetricOrder.ToList();var enabled=preferences.VisibleMetrics.ToHashSet();var list=new ListBox{Height=275,Margin=new Thickness(0,12,0,12)};metrics.Children.Add(list);
-        void RenderMetrics(string? selected=null){list.Items.Clear();foreach(var id in ordered){var box=new CheckBox{Content=L.T(MetricName(id)),IsChecked=enabled.Contains(id),Foreground=new SolidColorBrush(Ink),Padding=new Thickness(6),Tag=id};box.Checked+=(_,_)=>enabled.Add(id);box.Unchecked+=(_,_)=>enabled.Remove(id);list.Items.Add(box);if(id==selected)list.SelectedItem=box;}}
+        void RenderMetrics(string? selected=null){list.Items.Clear();foreach(var id in ordered){var box=new CheckBox{Content=L.T(MetricName(id)),IsChecked=enabled.Contains(id),Foreground=Theme.Solid(Ink),Padding=new Thickness(6),Tag=id};box.Checked+=(_,_)=>enabled.Add(id);box.Unchecked+=(_,_)=>enabled.Remove(id);list.Items.Add(box);if(id==selected)list.SelectedItem=box;}}
         RenderMetrics();var move=new StackPanel{Orientation=Orientation.Horizontal};
+        metrics.Children.Add(Button("GitHub…","Select and order GitHub metrics, detail-only display and local targets",()=>{dialog.Close();ShowGitHubMetrics();}));
         metrics.Children.Add(Button("Show all metrics","Show all metrics",()=>{foreach(var id in ordered)enabled.Add(id);RenderMetrics();}));metrics.Children.Add(Button("Hide all metrics","Hide all metrics",()=>{enabled.Clear();RenderMetrics();}));
         void Move(int delta){if(list.SelectedItem is not CheckBox item)return;string id=(string)item.Tag;int index=ordered.IndexOf(id),target=index+delta;if(target<0||target>=ordered.Count)return;ordered.RemoveAt(index);ordered.Insert(target,id);RenderMetrics(id);}
         move.Children.Add(Button("Move up","Move up",()=>Move(-1)));move.Children.Add(Button("Move down","Move down",()=>Move(1)));metrics.Children.Add(move);
@@ -171,12 +180,12 @@ public sealed partial class Widget
             var next=preferences.Copy();next.TrayEnabled=trayCheck.IsChecked==true||startup.IsChecked==true;next.SnapEdges=snap.IsChecked==true;next.Use24Hour=hours.IsChecked==true;next.Language=languageIds[Math.Max(0,language.SelectedIndex)];next.Opacity=opacity.Value;
             next.ForecastEnabled=forecastCheck.IsChecked==true;next.CapacityAlerts=capacityCheck.IsChecked==true;next.LowQuotaEnabled=low.IsChecked==true;next.LowQuotaThreshold=threshold.SelectedItem is int value?value:20;next.HistoryEnabled=historyCheck.IsChecked==true;next.MetricOrder=ordered.ToList();next.VisibleMetrics=ordered.Where(enabled.Contains).ToList();
             next.ActiveProvidersOnly=activeOnly.IsChecked==true;next.MinimizeToTray=minimizeCheck.IsChecked==true;
-            next.TaskbarMetric=taskbarIds[Math.Max(0,taskbarChoice.SelectedIndex)];
+            next.TaskbarMetric=taskbarIds[Math.Max(0,taskbarChoice.SelectedIndex)];next.GlassTheme=Theme.Ids[Math.Max(0,glassTheme.SelectedIndex)];
             foreach(var (id,box) in rateBoxes)next.RefreshSeconds[id]=box.SelectedItem is int seconds?seconds:(id=="codex"?60:300);
             try{
                 next.Save(SettingsPath);
                 try{if((startup.IsChecked==true)!=StartupRegistration.Enabled)StartupRegistration.Set(startup.IsChecked==true);}catch{preferences.Save(SettingsPath);throw;}
-                preferences=next;RefreshForecasts(true);L.Set(next.Language);Opacity=next.Opacity;schedule.Reset();ConfigureTray();ApplyMetricPreferences();AdaptLayout();dialog.Close();
+                preferences=next;Theme.Select(next.GlassTheme);RefreshForecasts(true);L.Set(next.Language);Opacity=next.Opacity;schedule.Reset();ConfigureTray();ApplyMetricPreferences();AdaptLayout();dialog.Close();
             }catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException){status.Text=L.T("Could not save settings. Check folder access or an existing startup registration.");}
         }));saveSettings.Padding=new Thickness(20,7,20,7);saveSettings.Margin=new Thickness(8,0,0,0);saveBar.Children.Add(saveSettings);
         if(selftest)dialog.Loaded+=(_,_)=>{
@@ -189,7 +198,7 @@ public sealed partial class Widget
         };
         dialog.ShowDialog();
     }
-    static string MetricName(string id)=>id switch{"cpu"=>"CPU","ram"=>"Memory","disk"=>"Free disk","net"=>"Network","gpu"=>"GPU","vram"=>"Dedicated VRAM","frequency"=>"CPU frequency","battery"=>"Battery","read"=>"Disk read","write"=>"Disk write",_=>ProviderName(id)};
+    static string MetricName(string id)=>GitHubCatalog.Ids.Contains(id)?GitHubCatalog.Get(id).Name:id switch{"cpu"=>"CPU","ram"=>"Memory","disk"=>"Free disk","net"=>"Network","gpu"=>"GPU","vram"=>"Dedicated VRAM","frequency"=>"CPU frequency","battery"=>"Battery","read"=>"Disk read","write"=>"Disk write",_=>ProviderName(id)};
     void BuildProfileSettings(StackPanel panel,Window owner)
     {
         var choices=Choose(panel,"Profiles",profiles.Items.Select(p=>(object)p.Name),profiles.Items.FirstOrDefault()?.Name??"");var name=Input(panel,"Profile name","");name.MaxLength=32;var status=Text("",11,Muted);panel.Children.Add(status);
@@ -197,7 +206,7 @@ public sealed partial class Widget
         panel.Children.Add(Button("Save current layout","Save current layout",()=>{
             string label=name.Text.Trim();if(label.Length==0||label.Any(char.IsControl)){status.Text=L.T("Enter a profile name.");return;}
             int index=profiles.Items.FindIndex(p=>string.Equals(p.Name,label,StringComparison.OrdinalIgnoreCase));if(index<0&&profiles.Items.Count>=20){status.Text=L.T("Maximum 20 profiles.");return;}
-            var value=new LayoutProfile(label,Width,Height,compact,Topmost,Opacity,preferences.MetricOrder.ToList(),preferences.VisibleMetrics.ToList(),clockPreferences);
+            var value=new LayoutProfile(label,Width,Height,compact,Topmost,Opacity,preferences.MetricOrder.ToList(),preferences.VisibleMetrics.ToList(),clockPreferences,preferences.GitHubDetailsOnly.ToList(),preferences.GlassTheme);
             try{var copy=new ProfileStore{Items=profiles.Items.ToList()};if(index>=0)copy.Items[index]=value;else copy.Items.Add(value);copy.Save(System.IO.Path.Combine(Data,"profiles.json"));profiles=copy;choices.ItemsSource=profiles.Items.Select(p=>p.Name).ToList();choices.SelectedItem=label;status.Text=L.T("Saved.");}catch(IOException){status.Text=L.T("Could not save profile.");}catch(UnauthorizedAccessException){status.Text=L.T("Could not save profile.");}
         }));
         panel.Children.Add(Button("Load profile","Load profile",()=>{
@@ -211,9 +220,9 @@ public sealed partial class Widget
     }
     void ApplyProfile(LayoutProfile profile)
     {
-        var next=preferences.Copy();next.MetricOrder=profile.Order.ToList();next.VisibleMetrics=profile.Visible.ToList();next.Opacity=profile.Opacity;next.Normalize();next.Save(SettingsPath);
+        var next=preferences.Copy();next.MetricOrder=profile.Order.ToList();next.VisibleMetrics=profile.Visible.ToList();next.GitHubDetailsOnly=profile.GitHubDetailsOnly?.ToList()??new();next.GlassTheme=profile.GlassTheme;next.Opacity=profile.Opacity;next.Normalize();next.Save(SettingsPath);
         try{profile.Clocks.Save(System.IO.Path.Combine(Data,"clocks.json"));}catch{preferences.Save(SettingsPath);throw;}
-        preferences=next;clockPreferences=profile.Clocks;Opacity=next.Opacity;ApplyMetricPreferences();SetPinned(profile.Pinned);ApplyPreset(profile.Width,profile.Height);compact=profile.Compact;AdaptLayout();SavePosition();
+        preferences=next;Theme.Select(next.GlassTheme);clockPreferences=profile.Clocks;Opacity=next.Opacity;ApplyMetricPreferences();SetPinned(profile.Pinned);ApplyPreset(profile.Width,profile.Height);compact=profile.Compact;AdaptLayout();SavePosition();
     }
     void BuildUpdateSettings(StackPanel panel,Window owner)
     {
@@ -239,6 +248,7 @@ public sealed partial class Widget
     {
         var dialog=FeatureWindow("Usage history",680,660);var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Remaining allowance (%)",23));
+        stack.Children.Add(Button("GitHub usage history…","GitHub typed history and details",()=>{dialog.Close();ShowGitHubDetails(true);}));
         var provider=Choose(stack,"Metrics",WidgetPreferences.ProviderIds.Select(id=>(object)ProviderName(id)),"Codex");
         var selector=Choose(stack,"Quota window",new object[]{L.T("Legacy aggregate")},L.T("Legacy aggregate"));
         var ranges=new[]{L.T("24 hours"),L.T("7 days"),L.T("30 days")};var range=Choose(stack,"Usage history",ranges,ranges[0]);

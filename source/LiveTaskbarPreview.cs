@@ -35,19 +35,19 @@ public sealed class LiveTaskbarPreview:IDisposable
     public static RenderTargetBitmap Render(Widget.BarMetric[] metrics,int width,int height)
     {
         var visual=new DrawingVisual();using(var drawing=visual.RenderOpen()){
-            Brush Ink=new SolidColorBrush(Color.FromRgb(244,250,255)),muted=new SolidColorBrush(Color.FromRgb(183,204,226));
-            drawing.DrawRoundedRectangle(new LinearGradientBrush(Color.FromRgb(27,48,74),Color.FromRgb(16,25,43),80),new Pen(new SolidColorBrush(Color.FromRgb(100,140,175)),1),new Rect(0,0,width,height),12,12);
+            Brush Ink=Theme.Solid(Color.FromRgb(244,250,255)),muted=Theme.Solid(Color.FromRgb(183,204,226));
+            drawing.DrawRoundedRectangle(Theme.Adapt(new LinearGradientBrush(Color.FromRgb(27,48,74),Color.FromRgb(16,25,43),80)),new Pen(Theme.Solid(Color.FromRgb(100,140,175)),1),new Rect(0,0,width,height),12,12);
             void Text(string value,double x,double y,double size,Brush brush,double max){var text=new FormattedText(value,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface("Segoe UI"),size,brush,1){MaxTextWidth=Math.Max(1,max),MaxTextHeight=size*1.5,Trimming=TextTrimming.CharacterEllipsis};drawing.DrawText(text,new Point(x,y));}
             if(width>=80&&height>=60){
             if(metrics.Length==0)Text(L.T("No metrics selected"),14,45,12,muted,width-28);
             int columns=metrics.Length>6&&width>=240?2:1;int maximum=Math.Max(1,(height-42)/32)*columns;int omitted=Math.Max(0,metrics.Length-maximum);metrics=metrics.Take(maximum).ToArray();
-            Text(omitted>0?"P R I S M  · +"+omitted:"P R I S M",14,10,omitted>0?12:14,Ink,width-28);
+            Text(omitted>0?"Prism · +"+omitted:"Prism",14,10,omitted>0?12:14,Ink,width-28);
             int count=(int)Math.Ceiling(metrics.Length/(double)columns);double cell=(width-28d-12*(columns-1))/columns;double row=count==0?30:Math.Min(44,(height-42d)/count);
             for(int i=0;i<metrics.Length;i++){
                 var metric=metrics[i];double x=14+(i%columns)*(cell+12),y=34+(i/columns)*row;bool current=metric.Percent.HasValue&&double.IsFinite(metric.Percent.Value)&&metric.Percent.Value is >=0 and <=100;
-                var color=new SolidColorBrush(metric.Capacity?Color.FromRgb(184,172,255):Color.FromRgb(110,239,221));
+                var color=Theme.Solid(metric.Capacity?Color.FromRgb(184,172,255):Color.FromRgb(110,239,221));
                 Text(metric.Label,x,y,Math.Min(12,row*.35),muted,cell*.6);Text(metric.Value,x+cell*.62,y,Math.Min(12,row*.35),Ink,cell*.38);
-                double barY=y+Math.Min(20,row*.5);drawing.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(49,67,88)),null,new Rect(x,barY,cell,3),1.5,1.5);
+                double barY=y+Math.Min(20,row*.5);drawing.DrawRoundedRectangle(Theme.Solid(Color.FromRgb(49,67,88)),null,new Rect(x,barY,cell,3),1.5,1.5);
                 if(current)drawing.DrawRoundedRectangle(color,null,new Rect(x,barY,cell*metric.Percent!.Value/100,3),1.5,1.5);
                 else Text(L.T(metric.State),x,barY+4,Math.Min(10,row*.25),muted,cell);
             }
