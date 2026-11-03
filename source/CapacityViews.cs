@@ -78,7 +78,7 @@ public sealed partial class Widget
     void ShowTrayCapacity()
     {
         if(trayView is not null){trayView.Activate();return;}
-        var window=new Window{Title="Prism · "+L.T("Capacity"),Width=340,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-24,WindowStyle=WindowStyle.ToolWindow,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var window=new Window{Title="Prism · "+L.T("Capacity"),Width=340,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-24,WindowStyle=WindowStyle.ToolWindow,ResizeMode=ResizeMode.NoResize,ShowInTaskbar=false,Topmost=true,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(18)};window.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("PRISM",20));
         var system=Text("",16);stack.Children.Add(system);
         var list=new StackPanel();stack.Children.Add(list);

@@ -22,6 +22,7 @@ public sealed class WidgetPreferences
     public int LowQuotaThreshold {get;set;}=20;
     public bool Use24Hour {get;set;}=true;
     public string Language {get;set;}="en";
+    public string GlassTheme {get;set;}="aurora";
     public double Opacity {get;set;}=1;
     public List<string> MetricOrder {get;set;}=MetricIds.ToList();
     public List<string> VisibleMetrics {get;set;}=BaseMetricIds.ToList();
@@ -29,6 +30,7 @@ public sealed class WidgetPreferences
     public void Normalize()
     {
         if(!new[]{"en","hi","es","fr"}.Contains(Language))Language="en";
+        if(!Theme.Ids.Contains(GlassTheme))GlassTheme="aurora";
         if(!double.IsFinite(Opacity))Opacity=1;Opacity=Math.Clamp(Opacity,.65,1);
         LowQuotaThreshold=Math.Clamp(LowQuotaThreshold,1,50);
         if(!new[]{"none","cpu","ram","gpu","battery"}.Concat(ProviderIds).Contains(TaskbarMetric))TaskbarMetric="none";
@@ -66,7 +68,7 @@ public sealed class ProviderSchedule
     public void Reset()=>next.Clear();
 }
 
-public sealed record LayoutProfile(string Name,double Width,double Height,bool Compact,bool Pinned,double Opacity,List<string> Order,List<string> Visible,ClockPreferences Clocks);
+public sealed record LayoutProfile(string Name,double Width,double Height,bool Compact,bool Pinned,double Opacity,List<string> Order,List<string> Visible,ClockPreferences Clocks,string GlassTheme="aurora");
 public sealed class ProfileStore
 {
     public List<LayoutProfile> Items {get;set;}=new();

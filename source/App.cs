@@ -26,7 +26,7 @@ public class App : Application
         string identity=Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(AppContext.BaseDirectory.ToUpperInvariant())))[..16];
         using var instance=diagnostic?null:new System.Threading.Mutex(true,"Local\\PrismWidget_"+identity,out created);
         if(!created){ActivateExisting(identity);return;}
-        var app = new App();Theme.Install(app);
+        var app = new App();Theme.Select(diagnostic?"aurora":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).GlassTheme);
         L.Set(diagnostic?"en":WidgetPreferences.Load(System.IO.Path.Combine(AppContext.BaseDirectory,"data","preferences.json")).Language);
         app.DispatcherUnhandledException += (_,e) => { try { File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory,"error.log"),DateTime.UtcNow.ToString("O")+" "+e.Exception.GetType().Name+Environment.NewLine); } catch {} e.Handled=true;if(diagnostic)app.Shutdown(1); };
         if(!diagnostic&&!RuntimeSupport.Ready(AppContext.BaseDirectory)){app.Run(RuntimeSupport.SetupWindow(AppContext.BaseDirectory));return;}
@@ -109,7 +109,7 @@ public sealed partial class Widget : Window
         AllowsTransparency=true; Background=Brushes.Transparent; ResizeMode=ResizeMode.CanResize;
         MinWidth=340; MinHeight=220; MaxWidth=SystemParameters.WorkArea.Width;
         UseLayoutRounding=true;SnapsToDevicePixels=true;TextOptions.SetTextFormattingMode(this,TextFormattingMode.Display);
-        FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI"); Foreground=new SolidColorBrush(Ink);
+        FontFamily=new FontFamily("Segoe UI Variable Text, Segoe UI"); Foreground=Theme.Solid(Ink);
         WindowStartupLocation=WindowStartupLocation.Manual;
         Left=SystemParameters.WorkArea.Right-Width-24; Top=SystemParameters.WorkArea.Top+24;
         MaxHeight=SystemParameters.WorkArea.Height-24;
@@ -135,10 +135,10 @@ public sealed partial class Widget : Window
             else if(e.Key==Key.Escape)Close();
         };
     }
-    static SolidColorBrush Brush(string hex)=>new((Color)ColorConverter.ConvertFromString(hex));
+    static SolidColorBrush Brush(string hex)=>Theme.Solid((Color)ColorConverter.ConvertFromString(hex));
     static TextBlock Text(string value,double size=12,Color? color=null)
     {
-        var text=new TextBlock{Text=L.T(value),FontSize=size,Foreground=new SolidColorBrush(color??Ink),TextWrapping=TextWrapping.Wrap,FontWeight=size>=18?FontWeights.Medium:FontWeights.Normal};
+        var text=new TextBlock{Text=L.T(value),FontSize=size,Foreground=Theme.Solid(color??Ink),TextWrapping=TextWrapping.Wrap,FontWeight=size>=18?FontWeights.Medium:FontWeights.Normal};
         // Fixed-width digits keep live readings from shimmering as values change.
         if(size>=14)System.Windows.Documents.Typography.SetNumeralAlignment(text,FontNumeralAlignment.Tabular);
         if(L.Known(value))text.SetResourceReference(TextBlock.TextProperty,"t."+value);return text;
@@ -158,14 +158,14 @@ public sealed partial class Widget : Window
           </ControlTemplate.Triggers>
         </ControlTemplate>
         """);
-    static Brush Gradient(Color from,Color to,double angle){var brush=new LinearGradientBrush(from,to,angle);brush.Freeze();return brush;}
+    static Brush Gradient(Color from,Color to,double angle){var brush=new LinearGradientBrush(from,to,angle);brush.Freeze();return Theme.Adapt(brush);}
     static readonly Brush ButtonFill=Gradient(Color.FromArgb(235,46,72,106),Color.FromArgb(235,31,49,76),90),ButtonEdge=Gradient(Color.FromArgb(200,132,160,204),Color.FromArgb(150,72,96,134),90);
     static readonly Brush PrimaryFill=Gradient(Color.FromRgb(106,245,226),Color.FromRgb(169,155,255),0),PrimaryEdge=Gradient(Color.FromRgb(196,255,247),Color.FromRgb(204,193,255),0);
     static readonly Brush PanelEdge=Gradient(Color.FromArgb(150,164,196,236),Color.FromArgb(70,96,120,166),65);
-    static Button Primary(Button b){b.Background=PrimaryFill;b.BorderBrush=PrimaryEdge;b.Foreground=Brush("#0E1A2A");b.FontWeight=FontWeights.SemiBold;return b;}
+    static Button Primary(Button b){b.Background=Theme.Adapt(PrimaryFill);b.BorderBrush=Theme.Adapt(PrimaryEdge);b.Foreground=Brush("#0E1A2A");b.FontWeight=FontWeights.SemiBold;return b;}
     static Button Button(string text,string tip,Action click)
     {
-        var b=new PrismButton {Content=L.T(text),ToolTip=L.T(tip),Foreground=new SolidColorBrush(Ink),Background=ButtonFill,BorderBrush=ButtonEdge,BorderThickness=new Thickness(1),Padding=new Thickness(9,5,9,5),Cursor=Cursors.Hand,FontSize=12,Margin=PrismButton.RowMargin,Template=ButtonTemplate};
+        var b=new PrismButton {Content=L.T(text),ToolTip=L.T(tip),Foreground=Theme.Solid(Ink),Background=Theme.Adapt(ButtonFill),BorderBrush=Theme.Adapt(ButtonEdge),BorderThickness=new Thickness(1),Padding=new Thickness(9,5,9,5),Cursor=Cursors.Hand,FontSize=12,Margin=PrismButton.RowMargin,Template=ButtonTemplate};
         if(L.Known(text))b.SetResourceReference(ContentControl.ContentProperty,"t."+text);
         System.Windows.Automation.AutomationProperties.SetName(b,tip);ToolTipService.SetInitialShowDelay(b,250);
         b.Click+=(_,_)=>click();return b;
@@ -183,7 +183,7 @@ public sealed partial class Widget : Window
             if(ReadLocalValue(HorizontalAlignmentProperty)==DependencyProperty.UnsetValue)HorizontalAlignment=HorizontalAlignment.Left;
         }
     }
-    static Border Panel(UIElement child,string color="#85324A66",int radius=18)=>new(){Background=new LinearGradientBrush(Brush(color).Color,Color.FromArgb(95,30,37,64),70),BorderBrush=PanelEdge,BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
+    static Border Panel(UIElement child,string color="#85324A66",int radius=18)=>new(){Background=Theme.Adapt(new LinearGradientBrush((Color)ColorConverter.ConvertFromString(color),Color.FromArgb(95,30,37,64),70)),BorderBrush=Theme.Adapt(PanelEdge),BorderThickness=new Thickness(1),CornerRadius=new CornerRadius(radius),Padding=new Thickness(16),Child=child};
     void SetPinned(bool value){Topmost=value;pin.Content=metricPin.Content=value?"◆":"◇";}
     sealed class ActionRow
     {
@@ -194,7 +194,7 @@ public sealed partial class Widget : Window
         public Button Add(string label,string icon,string tip,Action action)
         {
             var button=Button("",tip,action);var content=new StackPanel{Orientation=Orientation.Horizontal};
-            content.Children.Add(new System.Windows.Shapes.Path{Data=Geometry.Parse(icon),Stroke=new SolidColorBrush(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center});
+            content.Children.Add(new System.Windows.Shapes.Path{Data=Geometry.Parse(icon),Stroke=Theme.Solid(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center});
             var text=Text(label,12);text.TextWrapping=TextWrapping.NoWrap;text.Margin=new Thickness(6,0,0,0);text.VerticalAlignment=VerticalAlignment.Center;content.Children.Add(text);labels.Add(text);
             button.Content=content;
             Buttons.Add(button);Element.Children.Add(button);return button;
@@ -212,7 +212,7 @@ public sealed partial class Widget : Window
     Button FitHeightButton()
     {
         var button=Button("","Fit height · fit the widget to its contents",FitHeight);
-        button.Content=new System.Windows.Shapes.Path{Data=Geometry.Parse("M2,1 L14,1 M2,15 L14,15 M8,4 L8,12 M5,7 L8,4 L11,7 M5,9 L8,12 L11,9"),Stroke=new SolidColorBrush(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
+        button.Content=new System.Windows.Shapes.Path{Data=Geometry.Parse("M2,1 L14,1 M2,15 L14,15 M8,4 L8,12 M5,7 L8,4 L11,7 M5,9 L8,12 L11,9"),Stroke=Theme.Solid(Ink),StrokeThickness=1.3,StrokeStartLineCap=PenLineCap.Round,StrokeEndLineCap=PenLineCap.Round,Width=16,Height=16,VerticalAlignment=VerticalAlignment.Center};
         return button;
     }
     void RestoreDetails(){compact=false;Height=Math.Clamp(expandedHeight,Math.Min(640,MaxHeight),MaxHeight);AdaptLayout();}
@@ -250,8 +250,8 @@ public sealed partial class Widget : Window
     StackPanel Brand(bool small)
     {
         var brand=new StackPanel{Orientation=Orientation.Horizontal,VerticalAlignment=VerticalAlignment.Center};
-        var logo=new Image{Source=new BitmapImage(new Uri("pack://application:,,,/Assets/prism-icon.png")),Width=small?20:28,Height=small?20:28,Margin=new Thickness(0,0,small?5:9,0)};RenderOptions.SetBitmapScalingMode(logo,BitmapScalingMode.HighQuality);brand.Children.Add(logo);
-        var text=Text(small?"PRISM":"P R I S M",small?13:20);text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;brand.Children.Add(text);
+        var logo=new PrismMark{Width=small?18:25,Height=small?21:29,Margin=new Thickness(0,0,small?6:8,0)};brand.Children.Add(logo);
+        var text=Text("Prism",small?14:21);text.FontWeight=FontWeights.SemiBold;text.VerticalAlignment=VerticalAlignment.Center;brand.Children.Add(text);
         brand.MouseLeftButtonDown+=(_,_)=>DragMove();return brand;
     }
     void Build()
@@ -263,7 +263,7 @@ public sealed partial class Widget : Window
         outer.BorderBrush=edge;
         fittedBody.Child=body;outer.Child=fittedBody;
         var surface=new Grid();
-        surface.Children.Add(new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Background=Brush("#101C30"),IsHitTestVisible=false,Effect=new DropShadowEffect{Color=Color.FromRgb(4,6,18),BlurRadius=20,ShadowDepth=5,Direction=270,Opacity=.55}});
+        surface.Children.Add(new Border{CornerRadius=new CornerRadius(25),Margin=new Thickness(10),Background=Brush("#101C30"),IsHitTestVisible=false,Effect=new DropShadowEffect{Color=Theme.Map(Color.FromRgb(4,6,18)),BlurRadius=20,ShadowDepth=5,Direction=270,Opacity=.55}});
         surface.Children.Add(new GlassSurface{Margin=new Thickness(10)});
         surface.Children.Add(outer);Content=surface;
         var grip=new Thumb{Width=22,Height=22,HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Bottom,Margin=new Thickness(0,0,15,15),Cursor=Cursors.SizeNWSE,ToolTip="Drag to resize · double-click to fit height"};
@@ -505,12 +505,12 @@ public sealed partial class Widget : Window
     }
     void ShowResetReminders()
     {
-        var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Reset reminders",Width=440,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};stack.Children.Add(Text("A nudge before the reset",23));
         var info=Text("Show a quiet, 12-second reminder when a quota window is about to reset and more than 10% remains. Each window alerts once per reset, even across restarts.",12,Muted);info.Margin=new Thickness(0,12,0,18);stack.Children.Add(info);
-        var enabled=new CheckBox{Content=L.T("Enable reset reminders"),IsChecked=resetReminders.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,12)};stack.Children.Add(enabled);
+        var enabled=new CheckBox{Content=L.T("Enable reset reminders"),IsChecked=resetReminders.Enabled,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,0,0,12)};stack.Children.Add(enabled);
         stack.Children.Add(Text("Remind me before reset",11,Muted));
-        var lead=new ComboBox{ItemsSource=ResetReminders.LeadOptions,SelectedItem=resetReminders.LeadMinutes,ItemStringFormat="{0} minutes",Margin=new Thickness(0,6,0,14),Foreground=new SolidColorBrush(Ink)};stack.Children.Add(lead);
+        var lead=new ComboBox{ItemsSource=ResetReminders.LeadOptions,SelectedItem=resetReminders.LeadMinutes,ItemStringFormat="{0} minutes",Margin=new Thickness(0,6,0,14),Foreground=Theme.Solid(Ink)};stack.Children.Add(lead);
         stack.Children.Add(Text("Only current readings with a known reset time qualify. Prism must be running, either visible or in the system tray.",11,Muted));
         var status=Text("",11,Muted);status.Margin=new Thickness(0,10,0,10);stack.Children.Add(status);
         stack.Children.Add(Button("Preview reminder","Show a sample reminder without changing alert history",()=>ShowReminder(new[]{"Codex · 5-hour: resets in 20m · 42% left"},true)));
@@ -539,15 +539,15 @@ public sealed partial class Widget : Window
     }
     void ShowClocks()
     {
-        var dialog=new Window{Title="Prism · World clocks",Width=490,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · World clocks",Width=490,SizeToContent=SizeToContent.Height,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Two places. One glance.",23));
         var info=Text("Add two clocks alongside your local time. Daylight saving is handled by Windows. Hover a clock for its date and UTC offset.",12,Muted);info.Margin=new Thickness(0,10,0,16);stack.Children.Add(info);
-        var enabled=new CheckBox{Content=L.T("Show two additional timezone clocks"),IsChecked=clockPreferences.Enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,0,0,8)};stack.Children.Add(enabled);
+        var enabled=new CheckBox{Content=L.T("Show two additional timezone clocks"),IsChecked=clockPreferences.Enabled,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,0,0,8)};stack.Children.Add(enabled);
         var zones=TimeZoneInfo.GetSystemTimeZones();
         (ComboBox zone,TextBox label) Choice(string title,string id,string name){
             var label=Input(stack,title+" label",name);label.MaxLength=24;
-            var combo=new ComboBox{ItemsSource=zones,DisplayMemberPath="DisplayName",SelectedValuePath="Id",SelectedValue=id,IsTextSearchEnabled=true,MaxDropDownHeight=260,Margin=new Thickness(0,8,0,4),Foreground=new SolidColorBrush(Ink)};
+            var combo=new ComboBox{ItemsSource=zones,DisplayMemberPath="DisplayName",SelectedValuePath="Id",SelectedValue=id,IsTextSearchEnabled=true,MaxDropDownHeight=260,Margin=new Thickness(0,8,0,4),Foreground=Theme.Solid(Ink)};
             combo.SelectionChanged+=(_,_)=>{if(combo.SelectedItem is TimeZoneInfo zone)label.Text=WorldClocks.Label(null,zone.Id);};
             stack.Children.Add(combo);return(combo,label);
         }
@@ -575,7 +575,7 @@ public sealed partial class Widget : Window
             report+=await stdout;await stderr;
         }catch{report+="Python diagnostics unavailable. Run Setup.cmd and try again.";}
         if(closed)return;
-        var dialog=new Window{Title="Prism · Diagnostics",Owner=this,Width=490,Height=500,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Diagnostics",Owner=this,Width=490,Height=500,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Connection diagnostics",23));
         var info=Text("Dependency availability only. This report contains no account IDs, quota values, credentials, folder paths or machine name. CLI detection here checks PATH; provider adapters also check supported installation locations.",12,Muted);info.Margin=new Thickness(0,12,0,12);stack.Children.Add(info);
@@ -585,7 +585,7 @@ public sealed partial class Widget : Window
     void ShowConnection(string key,string name)
     {
         if(key=="openrouter"){ShowOpenRouter();return;}
-        var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · automatic connections",Width=470,Height=570,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),ResizeMode=ResizeMode.NoResize,FontFamily=FontFamily};
         var stack=new StackPanel{Margin=new Thickness(24)};dialog.Content=new ScrollViewer{Content=stack,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};
         stack.Children.Add(Text("Automatic connections",24));
         var clockSetup=Button("World clocks…","Show or configure two additional timezone clocks",()=>{dialog.Close();ShowClocks();});clockSetup.Margin=new Thickness(0,12,0,0);stack.Children.Add(clockSetup);
@@ -600,7 +600,7 @@ public sealed partial class Widget : Window
         stack.Children.Add(Text("Reuse your existing sign-ins to read account quota. OpenCode Console uses its own CLI in a private temporary session; older Go keys use the Go usage endpoint. No model prompts are sent. See the connection guide for OpenCode setup.",12));
         var setupOpenCode=Button("Run setup / add OpenCode support","Prepare Python dependencies and optionally install the private OpenCode runtime",()=>OpenUrl(System.IO.Path.Combine(Root,"Setup.cmd")));setupOpenCode.Margin=new Thickness(0,12,0,0);stack.Children.Add(setupOpenCode);
         bool enabled=false;try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"connections.json")));enabled=doc.RootElement.GetProperty("allowStoredCredentials").GetBoolean();}catch{}
-        var consent=new CheckBox{Content="Allow my existing Cursor / OpenCode sign-ins",IsChecked=enabled,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,14,0,12)};stack.Children.Add(consent);
+        var consent=new CheckBox{Content="Allow my existing Cursor / OpenCode sign-ins",IsChecked=enabled,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,14,0,12)};stack.Children.Add(consent);
         var consentStatus=Text("",11,Muted);stack.Children.Add(consentStatus);
         stack.Children.Add(Primary(Button("Save connection preference","Enable or disable automatic authenticated quota reads",async()=>{
             try{
@@ -641,13 +641,13 @@ public sealed partial class Widget : Window
     }
     void ShowMemory()
     {
-        var dialog=new Window{Title="Prism · Free RAM",Width=490,Height=580,MinWidth=420,MinHeight=420,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=new SolidColorBrush(Ink),FontFamily=FontFamily};
+        var dialog=new Window{Title="Prism · Free RAM",Width=490,Height=580,MinWidth=420,MinHeight=420,MaxHeight=SystemParameters.WorkArea.Height-40,WindowStartupLocation=WindowStartupLocation.CenterOwner,Owner=this,Background=Theme.DialogBackground(),Foreground=Theme.Solid(Ink),FontFamily=FontFamily};
         var root=new Grid{Margin=new Thickness(24)};foreach(var height in new[]{GridLength.Auto,GridLength.Auto,new GridLength(1,GridUnitType.Star),GridLength.Auto,GridLength.Auto})root.RowDefinitions.Add(new(){Height=height});dialog.Content=root;
         var title=Text("A little breathing room",23);root.Children.Add(title);
         var desc=Text("Release eligible RAM pages from Prism or apps you select. Apps stay open and files are untouched. Memory can return immediately; the next interaction may be slower. This does not delete files or AI conversation memory.",12,Muted);desc.Margin=new Thickness(0,12,0,16);Grid.SetRow(desc,1);root.Children.Add(desc);
         var list=new StackPanel();var choices=new List<(CheckBox check,MemoryApp app)>();
         foreach(var app in MemoryApps()){
-            var check=new CheckBox{Content=$"{app.Name} · PID {app.Id} · {app.Bytes/1048576d:0} MB",IsChecked=app.Id==Environment.ProcessId,Foreground=new SolidColorBrush(Ink),Margin=new Thickness(0,6,0,6),FontSize=12};choices.Add((check,app));list.Children.Add(check);
+            var check=new CheckBox{Content=$"{app.Name} · PID {app.Id} · {app.Bytes/1048576d:0} MB",IsChecked=app.Id==Environment.ProcessId,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,6,0,6),FontSize=12};choices.Add((check,app));list.Children.Add(check);
         }
         var scroll=new ScrollViewer{Content=list,VerticalScrollBarVisibility=ScrollBarVisibility.Auto};Grid.SetRow(scroll,2);root.Children.Add(scroll);
         var result=Text("Only Prism is selected by default. Protected apps may be skipped.",11,Muted);result.Margin=new Thickness(0,14,0,14);Grid.SetRow(result,3);root.Children.Add(result);
@@ -814,7 +814,7 @@ public sealed partial class Widget : Window
             value.HorizontalAlignment=HorizontalAlignment.Right;value.Foreground=Brush(color);Add(row,value,2);stack.Children.Add(row);readout.Visibility=Visibility.Collapsed;stack.Children.Add(readout);
             bar=Bar(color);stack.Children.Add(bar);detail.Margin=new Thickness(0,6,0,0);stack.Children.Add(detail);
             Element=Panel(stack,"#75263853",14);Element.Padding=new Thickness(13,11,13,11);Element.Margin=new Thickness(0,0,8,8);Element.Cursor=Cursors.Hand;Element.ToolTip="Click to manage "+name+" connection";
-            Element.MouseLeftButtonUp+=(_,_)=>click();var edge=Element.BorderBrush;Element.MouseEnter+=(_,_)=>Element.BorderBrush=accent;Element.MouseLeave+=(_,_)=>Element.BorderBrush=edge;
+            Element.MouseLeftButtonUp+=(_,_)=>click();var edge=Element.BorderBrush;Element.MouseEnter+=(_,_)=>Element.BorderBrush=Theme.Adapt(accent);Element.MouseLeave+=(_,_)=>Element.BorderBrush=Theme.Adapt(edge);
             Element.Focusable=true;Element.KeyDown+=(_,e)=>{if(e.Key==Key.Enter||e.Key==Key.Space)click();};System.Windows.Automation.AutomationProperties.SetName(Element,name+" connection");
         }
         public void SetDensity(int level,double width)
@@ -867,7 +867,7 @@ public sealed partial class Widget : Window
             var capacityColor=Remaining<=10?Brush("#F0A29A"):Remaining<=25?Brush("#E8C083"):accent;
             value.Foreground=bar.Foreground=capacityColor;
             Element.Opacity=1;
-            status.Foreground=Health=="stale"?Brush("#E8B96D"):Health=="error"?Brush("#DEA1A5"):new SolidColorBrush(Muted);
+            status.Foreground=Health=="stale"?Brush("#E8B96D"):Health=="error"?Brush("#DEA1A5"):Theme.Solid(Muted);
             var resetDetails=reading.Windows.Where(w=>w.Reset.HasValue).Select(w=>$"{w.Label} resets {w.Reset!.Value.LocalDateTime:ddd, MMM d HH:mm}");
             Element.ToolTip=$"{name} · {reading.Source}\n{status.Text}\n{detail.Text}\n"+string.Join("\n",resetDetails)+"\nClick to manage connection";
             System.Windows.Automation.AutomationProperties.SetName(Element,$"{name} · {value.Text} · {status.Text}");

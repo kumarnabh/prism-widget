@@ -5,7 +5,7 @@ using System.Windows.Media;
 namespace Prism;
 
 /// <summary>Application-wide dark glass styling for standard WPF controls used by Prism's windows.</summary>
-public static class Theme
+public static partial class Theme
 {
     static readonly Color Base=Color.FromRgb(14,22,38), BaseDeep=Color.FromRgb(20,18,44);
     public static Brush DialogBackground()
@@ -14,13 +14,14 @@ public static class Theme
         brush.GradientStops.Add(new GradientStop(Color.FromRgb(16,30,50),0));
         brush.GradientStops.Add(new GradientStop(Base,.55));
         brush.GradientStops.Add(new GradientStop(BaseDeep,1));
-        brush.Freeze();return brush;
+        brush.Freeze();return Adapt(brush);
     }
     public static void Install(Application app)
     {
-        try{app.Resources.MergedDictionaries.Add((ResourceDictionary)XamlReader.Parse(Styles));}
+        try{if(installed is not null)app.Resources.MergedDictionaries.Remove(installed);installed=(ResourceDictionary)XamlReader.Parse(ThemedStyles());app.Resources.MergedDictionaries.Add(installed);}
         catch(XamlParseException){/* Stock controls remain usable if the theme cannot load. */}
     }
+    static ResourceDictionary? installed;
     const string Styles="""
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <SolidColorBrush x:Key="Prism.Ink" Color="#F8FBFF"/>

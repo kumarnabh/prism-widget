@@ -11,7 +11,7 @@ public sealed class HistoryChart : FrameworkElement
     protected override void OnRender(DrawingContext drawing)
     {
         base.OnRender(drawing);double w=Math.Max(1,ActualWidth-52),h=Math.Max(1,ActualHeight-40),left=38,top=8;
-        var muted=new SolidColorBrush(Color.FromRgb(185,205,225));var line=new Pen(new SolidColorBrush(Color.FromRgb(68,88,115)),.6);var accent=new SolidColorBrush(Color.FromRgb(106,245,226));
+        var muted=Theme.Solid(Color.FromRgb(185,205,225));var line=new Pen(Theme.Solid(Color.FromRgb(68,88,115)),.6);var accent=Theme.Solid(Color.FromRgb(106,245,226));
         void Label(string value,Point location)=>drawing.DrawText(new FormattedText(value,CultureInfo.CurrentCulture,FlowDirection.LeftToRight,new Typeface("Segoe UI"),10,muted,VisualTreeHelper.GetDpi(this).PixelsPerDip),location);
         foreach(int percent in new[]{0,25,50,75,100}){double y=top+h*(1-percent/100d);drawing.DrawLine(line,new(left,y),new(left+w,y));Label(percent.ToString(CultureInfo.CurrentCulture),new(4,y-6));}
         if(end<=start)return;
