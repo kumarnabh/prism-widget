@@ -227,6 +227,8 @@ def billing(payload, period):
         if p == 'actions' and u == 'minutes' and not any(word in s for word in ('storage', 'cache', 'artifact')):
             values['github-actions-spend'] = values.get('github-actions-spend', 0) + net
             metric = 'github-actions-minutes'
+        elif p == 'actions' and u in {'gb-hours', 'gb-hr'} and any(word in s for word in ('storage', 'cache', 'artifact')):
+            metric = 'github-actions-storage'
         elif p == 'packages':
             metric = 'github-packages-storage' if u in {'gb-hours', 'gb-hr'} and 'storage' in s else 'github-packages-transfer' if u == 'gb' and any(w in s for w in ('transfer', 'bandwidth')) else None
         elif p == 'codespaces':

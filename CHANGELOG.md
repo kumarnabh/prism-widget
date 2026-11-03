@@ -1,5 +1,10 @@
 # Change log
 
+## 2.3.1 — Account Actions storage
+
+- Add account-wide monthly Actions storage accrual in GB-hours, separate from current selected-repository artifact and cache bytes.
+- Clarify that reported Actions minutes cover the connected billing account across its repositories and are independent of selected repository filters.
+
 ## 2.3.0 — GitHub monitoring and selectable glass
 
 - Optional, read-only GitHub.com provider with explicit CLI reuse or an installation-specific Windows Credential Manager token; personal and explicitly selected organization billing remain separate.

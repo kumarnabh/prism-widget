@@ -66,7 +66,7 @@ public sealed partial class Widget
         preferences.VisibleMetrics.Clear();ApplyMetricPreferences();if(metricGrid.Children.Count!=0||expandedHardware.Children.Count!=0)throw new InvalidOperationException("Empty GitHub has no cards or reserved space");
         preferences.GitHubDetailsOnly.Clear();preferences.ActiveProvidersOnly=false;
         foreach(string selectedTheme in Theme.Ids){Theme.Select(selectedTheme);preferences.GlassTheme=selectedTheme;
-            foreach(var visible in new[]{new[]{"github-spend","github-actions-minutes","github-cache","github-artifacts"},WidgetPreferences.BaseMetricIds.Concat(GitHubCatalog.Ids).ToArray()}){
+            foreach(var visible in new[]{new[]{"github-spend","github-actions-minutes","github-actions-storage","github-artifacts"},WidgetPreferences.BaseMetricIds.Concat(GitHubCatalog.Ids).ToArray()}){
                 preferences.VisibleMetrics=visible.ToList();ApplyMetricPreferences();
                 foreach(string font in new[]{originalFont.Source,"Segoe UI"}){
                 FontFamily=new System.Windows.Media.FontFamily(font);

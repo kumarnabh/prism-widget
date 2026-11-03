@@ -1,7 +1,8 @@
 [
   {"id":"github-actions-spend","name":"Actions compute","unit":"USD","category":"currency","description":"Net reported runner compute charges after discounts; excludes storage."},
   {"id":"github-actions-allowance","name":"Actions allowance left","unit":"%","category":"allowance","description":"Unknown: billing usage reports do not expose an authoritative included allowance."},
-  {"id":"github-actions-minutes","name":"Actions minutes","unit":"minutes","category":"count","description":"Reported billing runner minutes, not workflow wall time or all free/public usage."},
+  {"id":"github-actions-minutes","name":"Account Actions minutes","unit":"minutes","category":"count","description":"Current UTC month runner minutes reported for the connected billing account across its repositories. Selected repository filters do not apply. Excludes free/public usage absent from the billing report."},
+  {"id":"github-actions-storage","name":"Actions storage accrued","unit":"GB-hours","category":"storage","description":"Current UTC month Actions storage accrual reported for the connected billing account across its repositories, including reported artifact/cache storage. Selected repository filters do not apply. GB-hours measure storage over time, not bytes currently stored or allowance remaining."},
   {"id":"github-runs","name":"Workflow executions","unit":"runs","category":"count","description":"Current-month workflow runs in explicitly selected repositories; rerun attempts are not separate executions."},
   {"id":"github-successes","name":"Workflow successes","unit":"runs","category":"count","description":"Selected repository runs with conclusion success."},
   {"id":"github-failures","name":"Workflow failures","unit":"runs","category":"count","description":"Selected repository runs with conclusion failure; cancelled/timed-out runs are not counted as failures."},
