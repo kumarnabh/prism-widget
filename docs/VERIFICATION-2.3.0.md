@@ -35,4 +35,4 @@ All images use synthetic account/quota/billing data and example hardware. The ne
 
 No live GitHub billing credentials were used for qualification and no paid workflows were dispatched. Unsupported allowances remain unknown; forecasts are local low-confidence estimates and local targets are not GitHub-enforced limits. These manual items remain unverified rather than being implied by synthetic renders.
 
-The full-history generic-secret detector flagged prose in an earlier version of the manual checklist. `.gitleaksignore` contains only that historical commit/file/rule/line fingerprint; the sentence was rewritten. All scanner rules and the existing exact public-extension-key exception remain unchanged. No credential was present in the flagged sentence.
+The full-history generic-secret detector flagged prose in an earlier manual checklist and a comment that quoted the same phrase. `.gitleaksignore` contains only those two historical commit/file/rule/line fingerprints; both phrases were rewritten. All scanner rules and the existing exact public-extension-key exception remain unchanged. Neither flagged sentence contained a credential.
