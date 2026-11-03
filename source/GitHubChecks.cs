@@ -55,7 +55,7 @@ public sealed partial class Widget
     readonly List<object> githubLayouts=new();
     void VerifyGitHubViews()
     {
-        var saved=preferences.Copy();bool savedConsent=githubConnected;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);string theme=Theme.Active;var now=DateTimeOffset.UtcNow;
+        var saved=preferences.Copy();var originalFont=FontFamily;bool savedConsent=githubConnected;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);string theme=Theme.Active;var now=DateTimeOffset.UtcNow;
         providerData["github"]=GitHubChecks.Fixture(now);preferences.DisabledProviders.Remove("github");preferences.ActiveProvidersOnly=true;
         foreach(var (id,card) in cards)if(providerData.TryGetValue(id,out var sample))card.Update(sample);
         preferences.VisibleMetrics=new(){"github-spend","github-cache"};preferences.GitHubDetailsOnly=new(){"github-cache"};ApplyMetricPreferences();
@@ -67,13 +67,17 @@ public sealed partial class Widget
         foreach(string selectedTheme in Theme.Ids){Theme.Select(selectedTheme);preferences.GlassTheme=selectedTheme;
             foreach(var visible in new[]{new[]{"github-spend","github-actions-minutes","github-cache","github-artifacts"},WidgetPreferences.BaseMetricIds.Concat(GitHubCatalog.Ids).ToArray()}){
                 preferences.VisibleMetrics=visible.ToList();ApplyMetricPreferences();
+                foreach(string font in new[]{originalFont.Source,"Segoe UI"}){
+                FontFamily=new System.Windows.Media.FontFamily(font);
                 foreach(var size in new[]{(340d,220d),(442d,858d),(560d,165d),(840d,800d),(1200d,120d),(420d,640d)}){
                     compact=size.Item2<640;Width=size.Item1;Height=MinimumMetricHeight(size.Item1)>size.Item2?MinimumMetricHeight(size.Item1):size.Item2;UpdateLayout();AdaptLayout();SyncGitHubTiles();UpdateLayout();Theme.Apply(this);var check=CheckLayout();
                     bool selection=visible.All(MetricVisible)&&metricGrid.Children.Count==visible.Length;
-                    githubLayouts.Add(new{theme=selectedTheme,metrics=visible.Length,width=ActualWidth,height=ActualHeight,check.fits,check.controls,check.scale,selection});
-                    if(visible.Length==4&&(size.Item1==442||size.Item1==1200||size.Item1==340))SavePreview($"preview-github-{selectedTheme}-{(int)size.Item1}.png",2);
+                    githubLayouts.Add(new{theme=selectedTheme,font,metrics=visible.Length,width=ActualWidth,height=ActualHeight,check.fits,check.controls,check.scale,selection,metricsOnly,desiredHeight=body.DesiredSize.Height,minimumHeight=MinHeight,maximumHeight=MaxHeight});
+                    if(font==originalFont.Source&&visible.Length==4&&(size.Item1==442||size.Item1==1200||size.Item1==340))SavePreview($"preview-github-{selectedTheme}-{(int)size.Item1}.png",2);
+                }
                 }
             }
+            FontFamily=originalFont;
             // Include the real WPF header, charts and AI cards in every theme render.
             preferences.VisibleMetrics=WidgetPreferences.BaseMetricIds.Concat(new[]{"github-spend","github-cache"}).ToList();ApplyMetricPreferences();compact=false;Width=442;Height=950;UpdateLayout();AdaptLayout();SyncGitHubTiles();UpdateLayout();Theme.Apply(this);SavePreview("preview-theme-"+selectedTheme+".png",2);
         }

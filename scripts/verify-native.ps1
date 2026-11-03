@@ -37,8 +37,8 @@ foreach($layout in $result.customized){
 if($result.systemLayouts.Count -ne 60){throw 'Expected 60 new system metric layout cases.'}
 foreach($layout in $result.systemLayouts){if(-not $layout.fits -or -not $layout.controls -or $layout.scale -lt 0.999){throw "System layout failed: $($layout.language), metrics=$($layout.metrics)"}}
 if($result.ecosystemLayouts.Count -ne 24){throw 'Expected 24 all-provider layout cases.'}
-if($result.githubLayouts.Count -ne 48){throw 'Expected 48 GitHub metric and theme layout cases.'}
-foreach($layout in $result.githubLayouts){if(-not $layout.fits -or -not $layout.controls -or -not $layout.selection -or $layout.scale -lt 0.999){throw "GitHub layout failed: $($layout.theme), $($layout.metrics) metrics, $($layout.width)x$($layout.height)"}}
+if($result.githubLayouts.Count -ne 96){throw 'Expected 96 GitHub metric, theme and fallback-font layout cases.'}
+foreach($layout in $result.githubLayouts){if(-not $layout.fits -or -not $layout.controls -or -not $layout.selection -or $layout.scale -lt 0.999){throw "GitHub layout failed: $($layout | ConvertTo-Json -Compress)"}}
 foreach($layout in $result.ecosystemLayouts){if(-not $layout.fits -or -not $layout.controls -or -not $layout.selection -or $layout.scale -lt 0.999){throw "Provider layout failed: $($layout.language), $($layout.width)x$($layout.height)"}}
 $hdPath=Join-Path $prismRoot 'preview-hd.png'
 if(-not (Test-Path -LiteralPath $hdPath) -or (Get-Item -LiteralPath $hdPath).LastWriteTimeUtc -lt $started){throw 'HD preview missing or stale.'}

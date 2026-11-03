@@ -381,7 +381,13 @@ public sealed partial class Widget : Window
                     foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,tileTight,height>=400);
                     SyncMetricValues();metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();body.Measure(new Size(availableWidth,double.PositiveInfinity));
                 }
-                if(body.DesiredSize.Height>height-42){foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,true,false);SyncMetricValues();metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();body.Measure(new Size(availableWidth,double.PositiveInfinity));}
+                if(body.DesiredSize.Height>height-42){
+                    foreach(var tile in metricTiles.Values)tile.Arrange(availableWidth/metricGrid.Columns,false,true,false);SyncMetricValues();metricGrid.InvalidateMeasure();metricBody.InvalidateMeasure();body.InvalidateMeasure();body.Measure(new Size(availableWidth,double.PositiveInfinity));
+                    // Font metrics differ across Windows versions/DPI. Once density is
+                    // minimal, grow to the measured content rather than scaling text.
+                    double required=Math.Ceiling(body.DesiredSize.Height+44);
+                    if(required>MinHeight&&required<=MaxHeight){MinHeight=required;if(Height<required)Height=required;}
+                }
                 return;
             }
             for(int level=compact?2:0;level<=2;level++){

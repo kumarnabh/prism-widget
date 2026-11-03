@@ -7,7 +7,7 @@
 - Detail-only placement, profile persistence, independent 30-minute scheduling, bounded GET-only transport, account isolation, safe backoff and source/month/freshness labels.
 - Local typed 30-day history, cautious low-confidence spending/target estimates and opt-in per-metric local-target alerts with persistent deduplication.
 - Refined header with an integrated vector prism mark and “Prism” wordmark. Select Aurora, Ocean, Dusk or neutral Clear glass in Settings; themes are remembered in profiles.
-- Offline GitHub fixtures, boundary/permission/account/pagination tests and 48 additional metric/theme layout renders. See docs/GITHUB.md for API availability, reporting delays and manual qualification limits.
+- Offline GitHub fixtures, boundary/permission/account/pagination tests and 96 additional metric/theme/font layout cases. Dense layouts use measured minimum heights across Windows font variants. See docs/GITHUB.md for API availability, reporting delays and manual qualification limits.
 
 ## 2.2.0 — Premium glass interface
 
