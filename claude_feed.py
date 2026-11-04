@@ -1,6 +1,16 @@
 """Claude Code status-line bridge: persist only validated numeric quota fields."""
 import json, math, pathlib, sys, time
 
+def configured(root):
+    """Recognize only this installation's exact opt-in bridge command."""
+    try:
+        config=pathlib.Path.home()/'.claude/settings.json'
+        if config.stat().st_size>1_000_000:return False
+        status=json.loads(config.read_text(encoding='utf-8-sig')).get('statusLine',{})
+        command='"'+(root/'.venv/Scripts/python.exe').as_posix()+'" "'+(root/'claude_feed.py').as_posix()+'"'
+        return isinstance(status,dict) and status.get('type')=='command' and status.get('command')==command
+    except (OSError,ValueError,AttributeError):return False
+
 def number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 

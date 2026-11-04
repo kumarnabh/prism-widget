@@ -39,8 +39,9 @@ public sealed partial class Widget
         foreach(var definition in GitHubCatalog.All){
             if(!metricTiles.TryGetValue(definition.Id,out var tile))continue;var metric=GitHubMetric(definition.Id,reading);
             string health=metric.State=="Live"?"ready":metric.State=="Stale"?"stale":metric.State is "Error" or "Permission"?"error":"unknown";
-            tile.Set(GitHubCatalog.Compact(metric.Value,metric.Unit),GitHubTooltip(metric,reading),null,health:health);
-            expandedHardwareTiles[definition.Id].Set(GitHubCatalog.Compact(metric.Value,metric.Unit),GitHubTooltip(metric,reading),null,health:health);
+            string value=metric.Value.HasValue?GitHubCatalog.Compact(metric.Value,metric.Unit):QuotaDisplay.Missing(metric.State);
+            tile.Set(value,GitHubTooltip(metric,reading),null,health:health);
+            expandedHardwareTiles[definition.Id].Set(value,GitHubTooltip(metric,reading),null,health:health);
         }
     }
     void RecordGitHub(JsonElement data,DateTimeOffset now)
@@ -78,19 +79,23 @@ public sealed partial class Widget
         var config=preview||selftest?new GitHubConnection():LocalJson.Load<GitHubConnection>(GitHubConnectionPath,20000)??new();
         panel.Children.Add(Text("GitHub",24));panel.Children.Add(Text("Allow read-only requests to api.github.com. Reuse the active github.com sign-in from GitHub CLI, or optionally save a fine-grained token in Windows Credential Manager. Prism never changes GitHub resources or billing.",13));
         var consent=Check(panel,"Enable GitHub collection",config.Enabled&&!preferences.DisabledProviders.Contains("github"));
-        var mode=Choose(panel,"Sign-in source",new[]{"GitHub CLI (recommended)","Windows Credential Manager"},config.Mode=="credential"?"Windows Credential Manager":"GitHub CLI (recommended)");
+        var mode=Choose(panel,"Sign-in source",new[]{"GitHub CLI","Windows Credential Manager"},config.Mode=="credential"?"Windows Credential Manager":"GitHub CLI");
         panel.Children.Add(Text("CLI setup: gh auth login --hostname github.com. Prism reuses existing permissions and never requests broader scopes. Environment-token overrides are ignored. Use gh auth switch --hostname github.com to select an account, then Refresh.",12,Muted));
         panel.Children.Add(Text("Personal billing: fine-grained Plan (read). Organization billing: Administration (read), selected organization and appropriate owner/billing access. Selected repositories: Metadata (read) and Actions (read). A normal CLI token may lack billing access; repository statistics can still work. Grant only what you need.",12,Muted));
         panel.Children.Add(Text("Optional fine-grained token (blank keeps the saved credential)",12,Muted));var secret=new PasswordBox{MaxLength=4096,Margin=new Thickness(0,6,0,14),Padding=new Thickness(8),Foreground=Theme.Solid(Ink),Background=Theme.Solid(Color.FromRgb(20,31,53)),BorderBrush=Theme.Solid(Color.FromRgb(51,71,107))};System.Windows.Automation.AutomationProperties.SetName(secret,"Optional fine-grained GitHub token");panel.Children.Add(secret);
+        secret.PasswordChanged+=(_,_)=>{using var entered=secret.SecurePassword;if(entered.Length>0)mode.SelectedIndex=1;};
         var org=Input(panel,"Organization (blank = personal billing)",config.Organization);org.MaxLength=39;
         var repos=Input(panel,"Selected repositories (owner/repo, one per line; maximum 20)",string.Join("\n",config.Repositories));repos.AcceptsReturn=true;repos.Height=90;repos.MaxLength=3000;
         panel.Children.Add(Text("Repository statistics are separate from billing. Billing reports cover metered usage and can lag. There is no guessed allowance, plan quota or spending limit. Showing a metric does not control collection or alerts.",12,Muted));
         var status=Text("",12,Muted);panel.Children.Add(status);
         panel.Children.Add(Primary(Button("Save connection","Save explicit GitHub collection consent",async()=>{
             try{
-                var nextConfig=new GitHubConnection{Enabled=consent.IsChecked==true,Mode=mode.SelectedIndex==1?"credential":"cli",Organization=org.Text.Trim(),Repositories=repos.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries).ToList()};nextConfig.Validate();
-                ResetGitHubAccount();
-                using(var credential=secret.SecurePassword)if(nextConfig.Mode=="credential"&&credential.Length>0)GitHubCredential.Save(Root,credential);
+                GitHubConnection nextConfig;
+                using(var credential=secret.SecurePassword){
+                    nextConfig=new GitHubConnection{Enabled=consent.IsChecked==true,Mode=GitHubConnection.ModeForSave(mode.SelectedIndex==1?"credential":"cli",credential.Length),Organization=org.Text.Trim(),Repositories=repos.Text.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries).ToList()};nextConfig.Validate();
+                    ResetGitHubAccount();
+                    if(nextConfig.Mode=="credential"&&credential.Length>0)GitHubCredential.Save(Root,credential);
+                }
                 secret.Clear();var next=preferences.Copy();if(nextConfig.Enabled)next.DisabledProviders.Remove("github");else if(!next.DisabledProviders.Contains("github"))next.DisabledProviders.Add("github");
                 LocalJson.Save(GitHubConnectionPath,nextConfig);githubConnected=nextConfig.Enabled;next.Save(SettingsPath);preferences=next;ResetGitHubAccount();dialog.Close();if(nextConfig.Enabled)await UpdateProvider("github");
             }catch(Exception e) when(e is IOException or UnauthorizedAccessException or InvalidOperationException){secret.Clear();status.Text="Could not save connection. Check the account/repository format and folder access.";}

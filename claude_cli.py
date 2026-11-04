@@ -99,6 +99,12 @@ def parse_screen(text):
     return windows
 
 
+def panel_without_limits(text):
+    return ('Session' in text and 'Total cost:' in text
+            and 'contributing to your limits usage' in text.lower()
+            and not parse_screen(text))
+
+
 def read_panel(exe):
     from winpty import PtyProcess, Backend
     import pyte
@@ -146,6 +152,8 @@ def read_panel(exe):
                     result, stable = windows, time.monotonic()
                 elif time.monotonic() - stable > 2:
                     return {'status': 'CLI', 'source': 'Claude Code /usage', 'at': time.time(), 'windows': windows}
+        if panel_without_limits(text):
+            return {'status': 'Unavailable', 'detail': 'Claude /usage returned activity statistics without plan limits. In Connections, use Connect Claude status line, restart Claude Code and complete a normal turn to publish subscription limits.'}
         return {'status': 'Unavailable', 'detail': 'Claude CLI did not return a readable usage panel. Open Claude /usage to check sign-in or setup.'}
     finally:
         terminal.close(force=True)

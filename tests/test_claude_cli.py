@@ -30,6 +30,11 @@ class CliTests(unittest.TestCase):
             self.assertNotIn('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC',c.environment())
     def test_cost_is_not_quota(self):
         self.assertEqual(c.parse_screen('Total cost: $0.00\nUsage: 0 input, 0 output\n'),[])
+    def test_activity_statistics_are_not_subscription_limits(self):
+        text='Session\nTotal cost: $0.0000\nWhat\'s contributing to your limits usage?\n98% of your usage was at >150k context\n52% from long sessions\n'
+        self.assertEqual(c.parse_screen(text),[])
+        self.assertTrue(c.panel_without_limits(text))
+        self.assertFalse(c.panel_without_limits('Current session\n20% used\n'))
     def test_rejects_stale_error_and_invalid(self):
         for text in ['Current session\n101% used','Current session\n-1% used','Current session\nlast known\n20% used','Current session\nFailed to load\n20% used']:
             self.assertEqual(c.parse_screen(text),[])

@@ -34,6 +34,14 @@ class ReviewRegressions(unittest.TestCase):
     def test_feed_discards_unexpected_nested_fields(self):
         data={'rate_limits':{'five_hour':{'used_percentage':10,'resets_at':100,'token':'do-not-copy'},'api_key':'do-not-copy'},'transcript':'do-not-copy'}
         self.assertEqual(feed.normalize(data),{'five_hour':{'used_percentage':10,'resets_at':100}})
+    def test_feed_connection_matches_exact_installation(self):
+        with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(pathlib.Path,'home',return_value=pathlib.Path(folder)):
+            root=pathlib.Path(folder)/'installation';config=pathlib.Path(folder)/'.claude/settings.json';config.parent.mkdir()
+            command='"'+(root/'.venv/Scripts/python.exe').as_posix()+'" "'+(root/'claude_feed.py').as_posix()+'"'
+            config.write_text(json.dumps({'statusLine':{'type':'command','command':command}}))
+            self.assertTrue(feed.configured(root));self.assertFalse(feed.configured(root/'other'))
+            config.write_text(json.dumps({'statusLine':{'type':'command','command':command+' --other'}}))
+            self.assertFalse(feed.configured(root))
     def test_feed_rejects_malformed_numeric_fields(self):
         for v in (True,-1,101,float('nan'),'40'):
             self.assertEqual(feed.normalize({'rate_limits':{'five_hour':{'used_percentage':v}}}),{})

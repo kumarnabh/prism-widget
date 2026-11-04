@@ -27,6 +27,18 @@ class RecoveryTests(unittest.TestCase):
         browser=reading('Stale',20,700)
         with patch.object(c,'collect',return_value=reading('Stale',75,900)),patch.object(a,'browser_claude',return_value=browser),patch.object(p,'claude_statusline',return_value=None):
             self.assertEqual(p.claude(),browser)
+    def test_connected_statusline_waiting_is_actionable_after_cli_failure(self):
+        pending={'status':'Waiting','source':'Claude Code status line','detail':'Complete a normal turn.'}
+        with patch.object(c,'collect',return_value={'status':'Unavailable'}),patch.object(a,'browser_claude',return_value=None),patch.object(p,'claude_statusline',return_value=pending):
+            self.assertEqual(p.claude(),pending)
+        with patch.object(c,'collect',return_value=reading()),patch.object(a,'browser_claude',return_value=None),patch.object(p,'claude_statusline',return_value=pending):
+            self.assertEqual(p.claude()['status'],'CLI')
+    def test_configured_statusline_without_sample_is_waiting_not_a_quota(self):
+        import claude_feed
+        with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(p,'DATA',pathlib.Path(folder)),patch.object(claude_feed,'configured',return_value=True):
+            result=p.claude_statusline();self.assertEqual(result['status'],'Waiting');self.assertNotIn('windows',result)
+        with tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(p,'DATA',pathlib.Path(folder)),patch.object(claude_feed,'configured',return_value=False):
+            self.assertIsNone(p.claude_statusline())
     def test_malformed_cli_cache_is_refetched(self):
         for malformed in ([],None,{'identity':'x','checked':'bad'}, {'identity':'x','checked':time.time(),'reading':[]}):
             with self.subTest(cache=malformed),tempfile.TemporaryDirectory(dir=TMP) as folder,patch.object(c,'DATA',pathlib.Path(folder)),patch.object(c,'executable',return_value='claude.exe'),patch.object(c.subprocess,'run',return_value=SimpleNamespace(stdout='{"loggedIn":true,"authMethod":"claude.ai"}')),patch.object(c,'read_panel',return_value=reading()) as panel:

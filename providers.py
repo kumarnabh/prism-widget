@@ -123,11 +123,17 @@ def claude():
         except Exception:continue
     stale=[reading for reading in candidates if reading.get('windows')]
     if stale:return max(stale,key=lambda reading:reading.get('at',0))
+    waiting=next((reading for reading in candidates if reading.get('source')=='Claude Code status line' and reading.get('status')=='Waiting'),None)
+    if waiting:return waiting
     return candidates[0] if candidates else {'status':'Connect','detail':'Connect Claude Code from Settings.'}
 
 def claude_statusline():
     path=DATA/'claude-feed.json'
-    if not path.exists(): return None
+    if not path.exists():
+        import claude_feed
+        if claude_feed.configured(ROOT):
+            return {'status':'Waiting','source':'Claude Code status line','detail':'Status line connected. Restart Claude Code and complete a normal turn to publish subscription limits.'}
+        return None
     data=json.loads(path.read_text(encoding='utf-8-sig'))
     at=data.get('at')
     if not number(at) or at>time.time()+300: return {'status':'Unavailable','detail':'Claude feed has no valid timestamp.'}
@@ -136,7 +142,7 @@ def claude_statusline():
         w=(data.get('rate_limits') or {}).get(key) or {}
         item=window(w.get('used_percentage'),w.get('resets_at'),label)
         if item: windows.append(item)
-    if not windows: return {'status':'Waiting','detail':'Open Claude Code and complete a turn to refresh limits.'}
+    if not windows: return {'status':'Waiting','source':'Claude Code status line','detail':'Open Claude Code and complete a normal turn to refresh subscription limits.'}
     return {'status':'Feed' if time.time()-at<600 else 'Stale','source':'Claude Code status line','at':at,'windows':windows}
 
 def opencode():

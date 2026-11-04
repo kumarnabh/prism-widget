@@ -106,10 +106,10 @@ public sealed partial class Widget
     BarMetric[] TaskbarRows()
     {
         var now=DateTimeOffset.UtcNow;return preferences.MetricOrder.Where(MetricVisible).Select(id=>{
-            if(GitHubCatalog.Ids.Contains(id)){var githubValue=GitHubMetric(id,GitHubCurrent);return new BarMetric(GitHubCatalog.Get(id).Name,GitHubCatalog.Display(githubValue.Value,githubValue.Unit),null,githubValue.State);}
+            if(GitHubCatalog.Ids.Contains(id)){var githubValue=GitHubMetric(id,GitHubCurrent);return new BarMetric(GitHubCatalog.Get(id).Name,githubValue.Value.HasValue?GitHubCatalog.Display(githubValue.Value,githubValue.Unit):QuotaDisplay.Missing(githubValue.State),null,githubValue.State);}
             if(WidgetPreferences.ProviderIds.Contains(id)){
                 var reading=providerData.TryGetValue(id,out var data)?QuotaSnapshot.Read(data,now):null;bool fresh=reading is not null&&UsageHistory.Fresh(reading,now);
-                return new BarMetric(ProviderName(id),reading?.DashboardRemaining(id) is double remaining?$"{remaining:0.#}%":"—",fresh?reading?.DashboardRemaining(id):null,reading?.Status??"Unavailable",true);
+                return new BarMetric(ProviderName(id),reading?.DashboardRemaining(id) is double remaining?$"{remaining:0.#}%":QuotaDisplay.Missing(reading?.Status??"Unavailable"),fresh?reading?.DashboardRemaining(id):null,reading?.Status??"Unavailable",true);
             }
             var metric=Hardware.Metrics.FirstOrDefault(m=>m.Id==id);return new BarMetric(L.T(MetricName(id)),metric?.Display(now)??"—",metric?.Current(now)==true?metric.Percent:null,metric?.State(now)??"Unavailable");
         }).ToArray();

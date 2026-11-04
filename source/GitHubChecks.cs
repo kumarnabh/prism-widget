@@ -14,6 +14,8 @@ public static class GitHubChecks
     {
         void Require(bool value,string label){if(!value)throw new InvalidOperationException("GitHub check failed: "+label);}
         var now=new DateTimeOffset(2026,11,4,12,0,0,TimeSpan.Zero);var reading=GitHubReading.Read(Fixture(now,0),now);
+        Require(QuotaDisplay.Missing("Permission")==L.T("No access")&&QuotaDisplay.Missing("Connect")==L.T("Connect")&&QuotaDisplay.Missing("Unavailable")==L.T("Retry"),"unavailable cards explain their state without a blank dash");
+        Require(GitHubConnection.ModeForSave("cli",32)=="credential"&&GitHubConnection.ModeForSave("cli",0)=="cli"&&GitHubConnection.ModeForSave("credential",0)=="credential","entered credential cannot be silently discarded by CLI selection");
         Require(reading.Fresh(now)&&reading.Metric("github-spend").Value==0&&reading.Metric("github-actions-allowance").Value is null,"typed zero and unknown allowance");
         Require(reading.Repositories.Single().Name=="example/project","validated private repository drill-down labels");
         Require(GitHubReading.Read(Fixture(now),now.AddSeconds(3601)).Status=="Stale","freshness independent of schedule");
@@ -57,6 +59,10 @@ public sealed partial class Widget
     void VerifyGitHubViews()
     {
         var saved=preferences.Copy();var originalFont=FontFamily;bool savedConsent=githubConnected;var savedData=providerData.ToDictionary(p=>p.Key,p=>p.Value);string theme=Theme.Active;var now=DateTimeOffset.UtcNow;
+        using(var denied=JsonDocument.Parse("{\"provider_id\":\"github\",\"status\":\"Permission\",\"message\":\"permission\"}")){
+            providerData["github"]=denied.RootElement.Clone();SyncGitHubTiles();
+            if(metricTiles["github-actions-minutes"].DisplayValue!=L.T("No access")||metricTiles["github-actions-storage"].DisplayValue!=L.T("No access"))throw new InvalidOperationException("GitHub billing denial is visible in compact cards");
+        }
         providerData["github"]=GitHubChecks.Fixture(now);preferences.DisabledProviders.Remove("github");preferences.ActiveProvidersOnly=true;
         foreach(var (id,card) in cards)if(providerData.TryGetValue(id,out var sample))card.Update(sample);
         preferences.VisibleMetrics=new(){"github-spend","github-cache"};preferences.GitHubDetailsOnly=new(){"github-cache"};ApplyMetricPreferences();
