@@ -1,0 +1,11 @@
+# Prism 2.3.2 verification
+
+The reported missing cards were enabled and selected. Their absent values rendered as a dash in compact mode. The stored GitHub CLI credential received HTTP 404 from personal billing; repository access does not establish billing access. The signed-in Claude Code 2.1.161 usage panel returned session cost and activity statistics without subscription limits, including when opened after startup. Increasing capture height did not restore limits. No model prompts were sent during diagnosis.
+
+The fix renders actionable missing states in compact/expanded cards, restores the existing Claude status-line setup button, and recognizes a connected feed awaiting its first normal response. The local status-line integration preserves other Claude settings and backs up the prior configuration. It records only recognized numeric quota fields. It does not estimate limits from session cost or local activity percentages. Pending feed status cannot hide a valid CLI/browser reading.
+
+The GitHub connection dialog previously ignored an entered credential when the source remained CLI. Entering one now visibly selects Windows Credential Manager, and the save path independently enforces credential mode for non-empty input. Native checks protect this behavior. A local recheck after a reported save found CLI mode and no stored credential for the installation; no credential content was logged.
+
+109 Python tests and three browser tests passed. New regressions cover rejecting activity percentages, exact-installation feed recognition, absent feed samples and pending-feed fallback. Native verification passed in 77.9 seconds with 836 layout cases, explicit denied billing cards and credential mode selection checks. Existing Cursor expectations now assert Unknown for missing values, preserving numeric zero, percentages, stale handling and full/compact/accessibility agreement. Final hosted, package and local installed acceptance are reported in release notes.
+
+GitHub billing remains gated by the account's API entitlement and credential permission. A personal billing credential requires Plan (read). Claude status-line limits appear only after a normal Claude Code API response; setup alone does not create a quota sample. Physical monitor/DPI transitions and notification delivery remain manual checks.

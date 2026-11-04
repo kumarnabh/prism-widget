@@ -24,7 +24,7 @@ public sealed partial class Widget
             providerData["cursor"]=fixture.RootElement.Clone();cards["cursor"].Update(fixture.RootElement);
             if(cards["cursor"].Remaining!=expected||!cards["cursor"].Element.ToolTip.ToString()!.Contains("Other models 7%"))throw new InvalidOperationException("Cursor card retains category details");
             foreach(var density in new[]{(level:0,width:400d),(level:1,width:160d)}){
-                cards["cursor"].SetDensity(density.level,density.width);string value=expected is double percentage?$"{percentage:0.#}%":"—";
+                cards["cursor"].SetDensity(density.level,density.width);string value=expected is double percentage?$"{percentage:0.#}%":L.T("Unknown");
                 if(cards["cursor"].CompactValue!=value||!System.Windows.Automation.AutomationProperties.GetName(cards["cursor"].Element).Contains(value))throw new InvalidOperationException("Cursor full/compact/accessibility value");
             }
             double? fresh=scenario.age==0?expected:null;var row=TaskbarRows().Single(r=>r.Label==ProviderName("cursor"));

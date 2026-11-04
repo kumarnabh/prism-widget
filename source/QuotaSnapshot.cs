@@ -2,6 +2,13 @@ using System.Text.Json;
 
 namespace Prism;
 
+public static class QuotaDisplay
+{
+    public static string Missing(string state)=>L.T(state switch{
+        "Connect"=>"Connect", "Permission"=>"No access", "Disabled"=>"Disabled",
+        "Waiting"=>"Waiting", "Error" or "Unavailable"=>"Retry", _=>"Unknown"});
+}
+
 public sealed record QuotaWindow(string Label,double Remaining,DateTimeOffset? Reset,string Id="",bool Rolling=false);
 public sealed record QuotaSnapshot(string Status,string Source,string Detail,DateTimeOffset? Captured,IReadOnlyList<QuotaWindow> Windows,string Scope="")
 {

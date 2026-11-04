@@ -1,5 +1,12 @@
 # Change log
 
+## 2.3.2 — Visible provider connection states
+
+- Compact and expanded cards show Connect, No access, Waiting or Retry when no reading exists.
+- Restore the Claude status-line connection button, recognize its pending first response, and explain when Claude's CLI returns activity statistics without plan limits.
+- Entering a GitHub credential automatically selects secure credential mode; saving cannot silently discard it while CLI mode is selected.
+- Preserve unavailable readings, account billing permissions and genuine zero values; activity percentages are never interpreted as quota.
+
 ## 2.3.1 — Account Actions storage
 
 - Add account-wide monthly Actions storage accrual in GB-hours, separate from current selected-repository artifact and cache bytes.

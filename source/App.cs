@@ -619,6 +619,8 @@ public sealed partial class Widget : Window
         var claudeTitle=Text("CLAUDE SUBSCRIPTION",11,Muted);claudeTitle.Margin=new Thickness(0,28,0,9);stack.Children.Add(claudeTitle);
         stack.Children.Add(Text("Prism reads Claude Code’s /usage panel every 5 minutes. Sign in with your Claude subscription and finish any first-run CLI setup. No browser extension or manual numbers are needed; Claude Code manages its own credentials.",12));
         var guide=Button("Sign in to Claude","Open Claude Code's own subscription sign-in",()=>OpenUrl(System.IO.Path.Combine(Root,"Connect Claude CLI.cmd")));guide.Margin=new Thickness(0,14,0,10);stack.Children.Add(guide);
+        stack.Children.Add(Text("If /usage shows activity statistics without plan limits, connect the official Claude Code status-line feed. It publishes subscription limits after a normal Claude Code response. No model request is started by Prism.",12,Muted));
+        stack.Children.Add(Button("Connect Claude status line","Connect the official quota feed while preserving existing Claude settings",()=>ConnectClaude(dialog)));
         stack.Children.Add(Button("Connection guide","Show CLI setup and optional feed instructions",()=>OpenUrl(System.IO.Path.Combine(Root,"README.html"))));
         var status=Text("Codex is already automatic. Cursor and Go check their servers every 5 minutes; errors back off without losing the capture timestamp.",11,Muted);status.Margin=new Thickness(0,24,0,0);stack.Children.Add(status);
         dialog.ShowDialog();
@@ -804,7 +806,8 @@ public sealed partial class Widget : Window
     {
         public Border Element{get;}
         public string Health{get;private set;}="unknown";
-        public string CompactValue=>Remaining is double number?$"{number:0.#}%":"—";
+        string missing="Waiting";
+        public string CompactValue=>Remaining is double number?$"{number:0.#}%":QuotaDisplay.Missing(missing);
         public double? Remaining{get;private set;}
         readonly TextBlock value=Text("—",22),detail=Text("Connecting…",10,Muted),status=Text("WAITING",9,Muted);
         readonly Meter bar;readonly string name,key;readonly Brush accent;
@@ -839,7 +842,7 @@ public sealed partial class Widget : Window
             row.ColumnDefinitions[2].Width=new GridLength(tile?0:Math.Min(150,width*.40));
             value.HorizontalAlignment=tile?HorizontalAlignment.Left:HorizontalAlignment.Right;
             value.FontSize=tile?18:tight?19:22;
-            value.Text=Remaining is double remaining?(tile?$"{remaining:0.#}%":L.F("{0:0.#}% left",remaining)):"—";
+            value.Text=Remaining is double remaining?(tile?$"{remaining:0.#}%":L.F("{0:0.#}% left",remaining)):QuotaDisplay.Missing(missing);
             value.TextWrapping=TextWrapping.NoWrap;
             status.HorizontalAlignment=tile?HorizontalAlignment.Right:HorizontalAlignment.Left;
             status.Margin=new Thickness(tile?6:0,0,0,0);
@@ -856,11 +859,11 @@ public sealed partial class Widget : Window
             detail.Margin=new Thickness(0,tight?3:6,0,0);
             bar.Margin=new Thickness(0,tight?4:9,0,0);
         }
-        public void MarkOffline(){Remaining=null;bar.Value=0;Health="error";Element.Opacity=1;status.Text="REFRESH FAILED";bar.Opacity=.3;detail.Text="Reading unavailable · click to connect";value.Text="—";Element.ToolTip=$"{name} · {status.Text}\n{detail.Text}";}
+        public void MarkOffline(){Remaining=null;missing="Unavailable";bar.Value=0;Health="error";Element.Opacity=1;status.Text="REFRESH FAILED";bar.Opacity=.3;detail.Text="Reading unavailable · click to connect";value.Text=QuotaDisplay.Missing(missing);Element.ToolTip=$"{name} · {status.Text}\n{detail.Text}";}
         public void Update(JsonElement data)
         {
             var now=DateTimeOffset.UtcNow;var reading=QuotaSnapshot.Read(data,now);
-            Remaining=reading.DashboardRemaining(key);var state=reading.Status;status.Text=L.T(state);
+            Remaining=reading.DashboardRemaining(key);var state=reading.Status;missing=state;status.Text=L.T(state);
             if(reading.Captured is DateTimeOffset at){double seconds=Math.Max(0,(now-at).TotalSeconds);status.Text+=" · "+(seconds<60?L.T("just now"):seconds<3600?L.F("{0:0}m ago",seconds/60):L.F("{0:0}h ago",seconds/3600));}
             bar.Value=Remaining??0;bar.Opacity=Remaining.HasValue?1:.15;
             if(Remaining is double remaining){
@@ -868,7 +871,7 @@ public sealed partial class Widget : Window
                 var parts=reading.Windows.OrderBy(w=>key=="cursor"&&w.Id=="autoPercentUsed"?0:1).Select(w=>$"{w.Label} {w.Remaining:0.#}%").ToList();
                 string reset=reading.ResetSummary(now,key);if(reset.Length>0)parts.Add(reset);
                 detail.Text=string.Join(" · ",parts);
-            }else{value.Text="—";detail.Text=key=="cursor"&&reading.Windows.Count>0?L.T("Cursor models quota unavailable.")+" "+string.Join(" · ",reading.Windows.Select(w=>$"{w.Label} {w.Remaining:0.#}%")):L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out var reported)&&reported.ValueKind==JsonValueKind.Array&&reported.GetArrayLength()>0?"No current quota window · waiting for a fresh reading":reading.Detail);}
+            }else{value.Text=QuotaDisplay.Missing(missing);detail.Text=key=="cursor"&&reading.Windows.Count>0?L.T("Cursor models quota unavailable.")+" "+string.Join(" · ",reading.Windows.Select(w=>$"{w.Label} {w.Remaining:0.#}%")):L.T(reading.Windows.Count==0&&data.ValueKind==JsonValueKind.Object&&data.TryGetProperty("windows",out var reported)&&reported.ValueKind==JsonValueKind.Array&&reported.GetArrayLength()>0?"No current quota window · waiting for a fresh reading":reading.Detail);}
             Health=Remaining.HasValue?(state.Contains("Stale",StringComparison.OrdinalIgnoreCase)?"stale":"ready"):(state=="Connect"||state=="Waiting"?"unknown":"error");
             if(Health=="stale"){bar.Opacity=.4;detail.Text="Last reported · "+detail.Text;}
             var capacityColor=Remaining<=10?Brush("#F0A29A"):Remaining<=25?Brush("#E8C083"):accent;
@@ -890,6 +893,7 @@ public sealed partial class Widget : Window
         readonly Meter meter;
         readonly string name;readonly TextBlock label;
         public string Label=>label.Text;
+        public string DisplayValue=>value.Text;
         double fontSize=20;
         bool showChart;
         public MetricTile(string name,string icon,string color)

@@ -122,6 +122,7 @@ public sealed class GitHubHistory
 }
 public sealed class GitHubConnection
 {
+    public static string ModeForSave(string selected,int enteredLength)=>enteredLength>0?"credential":selected;
     public bool Enabled {get;set;}
     public string Mode {get;set;}="cli";
     public string Organization {get;set;}="";
