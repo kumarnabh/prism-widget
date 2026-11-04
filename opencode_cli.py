@@ -163,7 +163,7 @@ def legacy_or_setup():
     reading = auto_sources.collect_account('opencode')
     if reading.get('windows'):
         return reading
-    return {'status': 'Connect', 'detail': 'OpenCode v2 is missing or incompatible. For Console sign-in, run Setup.cmd and choose OpenCode support. Legacy Go-key quota is unavailable.'}
+    return {'status': 'Connect', 'detail': 'OpenCode v2 is missing or incompatible. Choose Connect OpenCode in Connections to install support and sign in. No terminal needs to stay open. Legacy Go-key quota is unavailable.'}
 
 
 def collect():

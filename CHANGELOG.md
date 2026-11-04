@@ -1,5 +1,12 @@
 # Change log
 
+## 2.3.3 - Easier provider setup
+
+- Connect OpenCode installs or verifies the private runtime and opens one-time standalone sign-in; no persistent command window is required.
+- Personal GitHub billing setup opens a prefilled read-only token form without requiring GitHub CLI.
+- Add an account usage metric preset and direct billing settings link; clarify storage units and local budget alerts.
+
+
 ## 2.3.2 — Visible provider connection states
 
 - Compact and expanded cards show Connect, No access, Waiting or Retry when no reading exists.

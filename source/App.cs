@@ -604,8 +604,8 @@ public sealed partial class Widget : Window
         }
         var desc=Text("No manual numbers. Sources refresh automatically and show when their reading was captured.",12,Muted);desc.Margin=new Thickness(0,12,0,18);stack.Children.Add(desc);
         stack.Children.Add(Text("CURSOR INDIVIDUAL + OPENCODE GO",11,Muted));
-        stack.Children.Add(Text("Reuse your existing sign-ins to read account quota. OpenCode Console uses its own CLI in a private temporary session; older Go keys use the Go usage endpoint. No model prompts are sent. See the connection guide for OpenCode setup.",12));
-        var setupOpenCode=Button("Run setup / add OpenCode support","Prepare Python dependencies and optionally install the private OpenCode runtime",()=>OpenUrl(System.IO.Path.Combine(Root,"Setup.cmd")));setupOpenCode.Margin=new Thickness(0,12,0,0);stack.Children.Add(setupOpenCode);
+        stack.Children.Add(Text("Reuse your existing sign-ins to read account quota. OpenCode Console uses its own CLI in a private temporary session; older Go keys use the Go usage endpoint. No model prompts are sent. Connect OpenCode below, then allow sign-in reuse and save. No terminal needs to stay open.",12));
+        var setupOpenCode=Button("Connect OpenCode","Install OpenCode support if needed and open one-time sign-in",()=>OpenUrl(System.IO.Path.Combine(Root,"Connect OpenCode.cmd")));setupOpenCode.Margin=new Thickness(0,12,0,0);stack.Children.Add(setupOpenCode);
         bool enabled=false;try {using var doc=JsonDocument.Parse(File.ReadAllText(System.IO.Path.Combine(Data,"connections.json")));enabled=doc.RootElement.GetProperty("allowStoredCredentials").GetBoolean();}catch{}
         var consent=new CheckBox{Content="Allow my existing Cursor / OpenCode sign-ins",IsChecked=enabled,Foreground=Theme.Solid(Ink),Margin=new Thickness(0,14,0,12)};stack.Children.Add(consent);
         var consentStatus=Text("",11,Muted);stack.Children.Add(consentStatus);

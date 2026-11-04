@@ -2,6 +2,17 @@
 
 GitHub is optional, off and invisible by default. Nothing is written to GitHub. No workflows, model calls, billing changes, artifact deletions or repository mutations are performed.
 
+### Quick personal account setup (no command line)
+
+1. Open **Connections > GitHub > Connect / disconnect**, then **Create personal billing token...**. This selects Windows Credential Manager and personal billing in the form.
+2. On GitHub, review **Plan: read** and the 90-day expiry, then generate the token. Account totals do not require repository permissions.
+3. Paste it into Prism's masked field, enable collection and **Save connection**. Leave Organization and repositories blank for personal totals. No terminal needs to stay open.
+4. Open **Metrics > Account usage preset > Save** for Actions minutes, accrued storage, compute charges and total metered spend.
+5. Under **Local targets & alerts**, optionally enter targets in minutes, GB-hours or USD and enable notifications. These do not read or change GitHub-enforced budgets. Use **Open personal billing settings...** for actual allowances and budgets.
+
+Replace the saved token after expiry or revocation. Organization tracking still requires Administration: read and appropriate organization billing access; this shortcut is specifically for personal billing.
+
+
 For monthly account totals, select **Account Actions minutes** and **Actions storage accrued** in Settings → Metrics → GitHub. These use the personal account's billing report (or the explicitly configured organization's report) across its billed repositories, independently of the repository selection. Storage is accrued **GB-hours**, not the amount currently stored or allowance remaining. Free/public runner usage absent from billing reports is not included. Missing storage rows or unsupported units remain unknown. The separate Actions artifacts/cache metrics describe current bytes in selected repositories.
 
 Personal billing requires **Plan (read)** user permission. A normal GitHub CLI OAuth sign-in can still read repository statistics but may be denied access to billing. Prism keeps account billing values unavailable in that case; CLI sign-in alone does not grant billing access. Use a compatible fine-grained credential through Connections if billing permission is unavailable; enter it only in the local masked credential field, never in JSON or chat.
