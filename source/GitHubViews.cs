@@ -85,7 +85,13 @@ public sealed partial class Widget
         panel.Children.Add(Text("Optional fine-grained token (blank keeps the saved credential)",12,Muted));var secret=new PasswordBox{MaxLength=4096,Margin=new Thickness(0,6,0,14),Padding=new Thickness(8),Foreground=Theme.Solid(Ink),Background=Theme.Solid(Color.FromRgb(20,31,53)),BorderBrush=Theme.Solid(Color.FromRgb(51,71,107))};System.Windows.Automation.AutomationProperties.SetName(secret,"Optional fine-grained GitHub token");panel.Children.Add(secret);
         secret.PasswordChanged+=(_,_)=>{using var entered=secret.SecurePassword;if(entered.Length>0)mode.SelectedIndex=1;};
         var org=Input(panel,"Organization (blank = personal billing)",config.Organization);org.MaxLength=39;
-        var repos=Input(panel,"Selected repositories (owner/repo, one per line; maximum 20)",string.Join("\n",config.Repositories));repos.AcceptsReturn=true;repos.Height=90;repos.MaxLength=3000;
+        panel.Children.Add(Text("Easiest personal account setup (no CLI): 1. Create a billing token below. 2. Keep Plan: read and generate it on GitHub. 3. Paste it above, enable collection and save. Leave repositories empty for account totals. Token expiry is managed on GitHub; replace it here when it expires.",12,Muted));
+        panel.Children.Add(Button("Create personal billing token...","Open GitHub's prefilled read-only Plan token form; review and generate it yourself",()=>{
+            mode.SelectedIndex=1;org.Text="";
+            OpenUrl("https://github.com/settings/personal-access-tokens/new?name=Prism%20billing&description=Read%20personal%20billing%20usage%20in%20Prism&expires_in=90&plan=read");
+        }));
+        panel.Children.Add(Button("Open personal billing settings...","Review actual usage, included allowances and GitHub budgets in your browser",()=>OpenUrl("https://github.com/settings/billing")));
+        var repos=Input(panel,"Optional repositories for run/artifact/cache details (owner/repo; maximum 20)",string.Join("\n",config.Repositories));repos.AcceptsReturn=true;repos.Height=90;repos.MaxLength=3000;
         panel.Children.Add(Text("Repository statistics are separate from billing. Billing reports cover metered usage and can lag. There is no guessed allowance, plan quota or spending limit. Showing a metric does not control collection or alerts.",12,Muted));
         var status=Text("",12,Muted);panel.Children.Add(status);
         panel.Children.Add(Primary(Button("Save connection","Save explicit GitHub collection consent",async()=>{
@@ -117,6 +123,9 @@ public sealed partial class Widget
         Render();var moves=new WrapPanel();panel.Children.Add(moves);
         void Move(int delta){if(list.SelectedItem is not ListBoxItem item)return;string id=(string)item.Tag;int index=order.IndexOf(id),target=index+delta;if(target<0||target>=order.Count)return;order.RemoveAt(index);order.Insert(target,id);Render(id);}
         moves.Children.Add(Button("Move up","Move selected metric up",()=>Move(-1)));moves.Children.Add(Button("Move down","Move selected metric down",()=>Move(1)));moves.Children.Add(Button("Select all","Select all GitHub metrics",()=>{selected.UnionWith(order);Render();}));moves.Children.Add(Button("Select none","Hide every GitHub metric",()=>{selected.Clear();Render();}));
+        moves.Children.Add(Button("Account usage preset","Show account Actions minutes, accrued storage and monthly spend; keep other selections",()=>{
+            foreach(string id in new[]{"github-actions-minutes","github-actions-storage","github-actions-spend","github-spend"}){selected.Add(id);details.Remove(id);}Render();
+        }));
         var targetsPanel=new StackPanel{Margin=new Thickness(12)};tabs.Items.Add(new TabItem{Header="Local targets & alerts",Content=new ScrollViewer{Content=targetsPanel,VerticalScrollBarVisibility=ScrollBarVisibility.Auto}});
         targetsPanel.Children.Add(Text("Local targets & thresholds",23));targetsPanel.Children.Add(Text("Targets are local preferences, not GitHub-enforced limits or included allowances. Opt-in alerts fire once at 75%, 90% and 100% of each Local target per account/month. Hidden metrics can alert. Forecasts do not trigger these measured-usage alerts. No included-allowance alerts are available without an authoritative denominator.",12,Muted));
         var percentChecks=new Dictionary<int,CheckBox>();foreach(int percent in new[]{75,90,100})percentChecks[percent]=Check(targetsPanel,"Notify at "+percent+"% of Local target",preferences.GitHubAlertPercents.Contains(percent));

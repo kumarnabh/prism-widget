@@ -133,7 +133,7 @@ class ConsoleTests(unittest.TestCase):
         for result in ({'status': 'Connect', 'detail': 'Sign-in needs attention.'}, {'status': 'Waiting', 'detail': 'Sign-in needs attention.'}, {'status': 'Unavailable'}):
             with patch.object(oc, 'executable', return_value=None), patch.object(oc.auto_sources, 'collect_account', return_value=result):
                 value = oc.collect()
-                self.assertEqual(value['status'], 'Connect'); self.assertIn('Setup.cmd', value['detail'])
+                self.assertEqual(value['status'], 'Connect'); self.assertIn('Connect OpenCode', value['detail'])
                 self.assertIn('OpenCode v2', value['detail']); self.assertNotIn('Sign-in needs attention', value['detail'])
 
     def test_registry_dispatch_and_disconnect_clear_both_caches(self):
